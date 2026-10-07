@@ -2,7 +2,7 @@
   "name": "hugo-code-dojo",
   "private": true,
   "scripts": {
-    "build": "next build",
+    "build": "npm run sync:repos && next build",
     "dev": "next dev",
     "typecheck": "tsc --noEmit",
     "format": "biome format --write .",
@@ -10,7 +10,9 @@
     "lint": "biome lint .",
     "check": "biome check .",
     "check:write": "biome check --write .",
-    "ci": "biome ci ."
+    "ci": "biome ci .",
+    "test": "node --experimental-strip-types --test tests/*.test.ts",
+    "sync:repos": "node --experimental-strip-types scripts/sync-repositories.ts"
   },
   "dependencies": {
     "motion": "^14.0.0",
@@ -27,5 +29,6 @@
   },
   "engines": {
     "node": ">=24 <25"
-  }
+  },
+  "type": "module"
 }

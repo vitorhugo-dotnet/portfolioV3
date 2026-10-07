@@ -3,11 +3,11 @@ import {
   DocumentLayout,
   DocumentSection,
 } from "../../../components/document-layout";
-export const metadata: Metadata = {
-  title: "SonicRelay — Privacy Policy | Hugo",
-  description:
-    "Read how SonicRelay handles data, permissions, retention and privacy requests.",
-};
+import { createPageMetadata } from "../../../lib/site-config";
+export const metadata: Metadata = createPageMetadata(
+  "SonicRelay — Privacy Policy | Hugo",
+  "Read how SonicRelay handles data, permissions, retention and privacy requests.",
+);
 export default function PrivacyPolicy() {
   return (
     <DocumentLayout application="SonicRelay" updated="2026-08-18">

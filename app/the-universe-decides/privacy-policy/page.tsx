@@ -3,11 +3,11 @@ import {
   DocumentLayout,
   DocumentSection,
 } from "../../../components/document-layout";
-export const metadata: Metadata = {
-  title: "The Universe Decides — Privacy Policy | Hugo",
-  description:
-    "Read how The Universe Decides handles data, permissions, retention and privacy requests.",
-};
+import { createPageMetadata } from "../../../lib/site-config";
+export const metadata: Metadata = createPageMetadata(
+  "The Universe Decides — Privacy Policy | Hugo",
+  "Read how The Universe Decides handles data, permissions, retention and privacy requests.",
+);
 export default function PrivacyPolicy() {
   return (
     <DocumentLayout application="The Universe Decides" updated="2026-07-16">

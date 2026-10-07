@@ -1292,3 +1292,15 @@ fieldset.activity-tabs {
   color: var(--ink);
   border-color: var(--red);
 }
+.repository-sites {
+  margin-top: 70px;
+}
+.repository-sites > h2 {
+  font-size: 36px;
+  letter-spacing: -1px;
+}
+.repository-sites .hub-card h3 {
+  margin-top: 20px;
+  font-size: 25px;
+  overflow-wrap: anywhere;
+}

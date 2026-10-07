@@ -6,6 +6,8 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * *'
 
 permissions:
   contents: read
@@ -36,15 +38,7 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      # There is currently no automated test suite. A future test script is
-      # picked up here automatically; failures still fail this job.
-      - name: Run tests when configured
-        run: |
-          if npm pkg get scripts.test | grep -q '"'; then
-            npm test
-          else
-            echo 'No automated test suite configured; see README validation guidance.'
-          fi
+      - run: npm test
 
   build:
     needs: [quality, test]
@@ -64,6 +58,10 @@ jobs:
             test -s "out/$route.html"
           done
           test -s out/404.html
+          test -s out/sitemap.xml
+          test -s out/robots.txt
+          test -s out/favicon.svg
+          test -s out/hugo-preview.png
       - uses: actions/upload-artifact@v7
         with:
           name: portfolio-static-${{ github.sha }}

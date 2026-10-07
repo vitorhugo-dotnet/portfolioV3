@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="60" height="50" viewBox="0 0 60 50"
+     role="img" aria-label="H logo">
+  <rect width="60" height="50" fill="#0C1115"/>
+
+  <!-- H -->
+  <path
+    d="M17 11H23V22H32V11H38V38H32V27H23V38H17Z"
+    fill="#EFECE3"
+  />
+
+  <!-- Red dot -->
+  <circle cx="46" cy="35" r="4" fill="#FF6652"/>
+</svg>

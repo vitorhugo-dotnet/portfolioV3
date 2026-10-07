@@ -1,11 +1,16 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import "./style.css";
+import {
+  createPageMetadata,
+  siteDescription,
+  siteTitle,
+} from "../lib/site-config";
 
 export const metadata: Metadata = {
-  title: "Hugo — Entre código e caos",
-  description:
-    "Vitor Hugo. Full-stack developer: Java, Spring, C#, .NET. Produtos, apps Android e experimentos.",
+  ...createPageMetadata(siteTitle, siteDescription),
+  icons: { icon: { url: "/favicon.svg", type: "image/svg+xml" } },
+  robots: { index: true, follow: true },
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
