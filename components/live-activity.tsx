@@ -9,7 +9,6 @@ import {
 import {
   type LiveActivityResponse,
   type Provider,
-  type ProviderState,
   parseLiveActivity,
   providers,
 } from "../lib/live-activity.ts";
@@ -23,11 +22,6 @@ const labels: Record<
   spotify: { title: "Spotify", symbol: "♫", category: "MÚSICA" },
   simkl: { title: "Simkl", symbol: "▶", category: "ANIME & SÉRIES" },
   steam: { title: "Steam", symbol: "✳", category: "JOGOS" },
-};
-const fallback: Record<Exclude<ProviderState, "available">, string> = {
-  empty: "Nenhuma atividade recente disponível.",
-  unavailable: "Esta atividade está indisponível por enquanto.",
-  unconfigured: "Esta integração ainda não está conectada.",
 };
 function details(
   provider: Provider,
@@ -160,6 +154,15 @@ export function LiveActivitySection() {
     };
   }, [endpoint]);
   const stale = data ? isActivityStale(data.generatedAt, clock) : false;
+  const activeProviders = data
+    ? providers.filter((provider) => {
+        if (provider === "coding")
+          return data.coding?.status === "active" && !stale;
+        if (provider === "spotify") return data.spotify?.isPlaying && !stale;
+        if (provider === "steam") return data.steam?.isPlaying && !stale;
+        return false;
+      })
+    : [];
   return (
     <section ref={section} id="agora" className="chapter live-activity">
       <div className="section-label">
@@ -202,90 +205,74 @@ export function LiveActivitySection() {
           )}
         </p>
       </div>
-      <div className="live-cards">
-        {providers.map((provider, index) => {
-          const info = data ? details(provider, data, stale) : undefined;
-          const state =
-            data?.providerStates[provider] ??
-            (endpoint ? (error ? "unavailable" : undefined) : "unconfigured");
-          return (
-            <Reveal
-              key={provider}
-              delay={index * 0.06}
-              className="live-card-reveal"
-            >
-              <article
-                className={`live-card live-${provider}`}
-                aria-busy={!state}
+      {activeProviders.length ? (
+        <div className="live-cards">
+          {activeProviders.map((provider, index) => {
+            const info = details(provider, data!, stale);
+            if (!info) return null;
+            return (
+              <Reveal
+                key={provider}
+                delay={index * 0.06}
+                className="live-card-reveal"
               >
-                <div className="live-card-heading">
-                  <span aria-hidden="true" className="live-symbol">
-                    {labels[provider].symbol}
-                  </span>
-                  <span className="tag">{labels[provider].category}</span>
-                  <span className="live-provider">
-                    {labels[provider].title}
-                  </span>
-                </div>
-                {!state ? (
-                  <div className="live-skeleton" role="status">
-                    <span className="sr-only">
-                      Carregando {labels[provider].title}
+                <article className={`live-card live-${provider}`}>
+                  <div className="live-card-heading">
+                    <span aria-hidden="true" className="live-symbol">
+                      {labels[provider].symbol}
                     </span>
-                    <i />
-                    <i />
-                    <i />
+                    <span className="tag">{labels[provider].category}</span>
+                    <span className="live-provider">
+                      {labels[provider].title}
+                    </span>
                   </div>
-                ) : info && state === "available" ? (
-                  <>
-                    <p className="live-status">{info.status}</p>
-                    <div className="live-card-content">
-                      {info.image && (
-                        <Image
-                          src={info.image}
-                          alt=""
-                          width={64}
-                          height={64}
-                          loading="lazy"
-                          referrerPolicy="no-referrer"
-                        />
-                      )}
-                      <div>
-                        <h3>{info.title}</h3>
-                        {info.subtitle && <p>{info.subtitle}</p>}
-                      </div>
+                  <p className="live-status">{info.status}</p>
+                  <div className="live-card-content">
+                    {info.image && (
+                      <Image
+                        src={info.image}
+                        alt=""
+                        width={64}
+                        height={64}
+                        loading="lazy"
+                        referrerPolicy="no-referrer"
+                      />
+                    )}
+                    <div>
+                      <h3>{info.title}</h3>
+                      {info.subtitle && <p>{info.subtitle}</p>}
                     </div>
-                    {info.observedAt && (
-                      <time
-                        className="live-observed"
-                        dateTime={info.observedAt}
-                      >
-                        Atividade em {displayTime(info.observedAt)}
-                      </time>
-                    )}
-                    {info.url && (
-                      <a
-                        href={info.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        Ver no {labels[provider].title} ↗
-                      </a>
-                    )}
-                  </>
-                ) : (
-                  <p className="live-fallback">
-                    {fallback[state === "available" ? "empty" : state]}
-                  </p>
-                )}
-              </article>
-            </Reveal>
-          );
-        })}
-      </div>
+                  </div>
+                  {info.observedAt && (
+                    <time
+                      className="live-observed"
+                      dateTime={info.observedAt}
+                    >
+                      Atividade em {displayTime(info.observedAt)}
+                    </time>
+                  )}
+                  {info.url && (
+                    <a
+                      href={info.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Ver no {labels[provider].title} ↗
+                    </a>
+                  )}
+                </article>
+              </Reveal>
+            );
+          })}
+        </div>
+      ) : data || error || !endpoint ? (
+        <p className="live-fallback">
+          Devo estar dormindo, no ônibus/dirigindo ou apenas o servidor saiu 💀
+        </p>
+      ) : null}
       <p className="footnote">
-        Atividade atual quando disponível; histórico recente nos intervalos.
-        Atualização a cada minuto enquanto esta seção está visível.
+        Apenas atividades acontecendo agora. Atualização a cada minuto enquanto
+        esta seção está visível.
       </p>
     </section>
   );
