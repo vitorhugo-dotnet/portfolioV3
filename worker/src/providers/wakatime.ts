@@ -15,7 +15,7 @@ export async function getCoding(
   try {
     const utcDay = new Date(deps.now()).toISOString().slice(0, 10);
     const headers = {
-      Authorization: `Basic ${btoa(`${env.WAKATIME_API_KEY}:`)}`,
+      Authorization: `Basic ${btoa(env.WAKATIME_API_KEY)}`,
     };
     const [heartbeatRaw, summaryRaw] = await Promise.all([
       fetchProviderJson(

@@ -67,6 +67,17 @@ test("coding without a heartbeat does not invent current activity", async () => 
   assert.equal(result.data?.status, "idle");
   assert.equal(result.data?.observedAt, undefined);
 });
+test("WakaTime uses the API key directly for Basic authentication", async () => {
+  let authorization: string | null = null;
+  await getCoding(
+    { WAKATIME_API_KEY: "12345" },
+    deps((url, init) => {
+      authorization = new Headers(init?.headers).get("Authorization");
+      return url.pathname.endsWith("heartbeats") ? { data: [] } : { data: [] };
+    }),
+  );
+  assert.equal(authorization, "Basic MTIzNDU=");
+});
 const track = {
   name: "Track",
   artists: [{ name: "Artist" }],
@@ -136,9 +147,11 @@ test("Spotify retries 401 only once and degrades on the second failure", async (
 test("Simkl checks last activity and returns only sanitized recent history", async () => {
   const result = await getSimkl(
     { SIMKL_CLIENT_ID: "client", SIMKL_ACCESS_TOKEN: "simkl-secret" },
-    deps((url) => {
-      if (url.pathname.endsWith("activities"))
+    deps((url, init) => {
+      if (url.pathname.endsWith("activities")) {
+        assert.equal(init?.method, "POST");
         return { all: "2026-10-07T10:00:00Z" };
+      }
       assert.ok(url.searchParams.has("date_from"));
       return {
         anime: [
