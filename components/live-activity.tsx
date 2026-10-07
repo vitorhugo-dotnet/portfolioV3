@@ -154,13 +154,14 @@ export function LiveActivitySection() {
     };
   }, [endpoint]);
   const stale = data ? isActivityStale(data.generatedAt, clock) : false;
-  const activeProviders = data
-    ? providers.filter((provider) => {
-        if (provider === "coding")
-          return data.coding?.status === "active" && !stale;
-        if (provider === "spotify") return data.spotify?.isPlaying && !stale;
-        if (provider === "steam") return data.steam?.isPlaying && !stale;
-        return false;
+  const activeCards = data
+    ? providers.flatMap((provider) => {
+        const isActive =
+          (provider === "coding" && data.coding?.status === "active") ||
+          (provider === "spotify" && data.spotify?.isPlaying) ||
+          (provider === "steam" && data.steam?.isPlaying);
+        const info = isActive && !stale ? details(provider, data, stale) : null;
+        return info ? [{ provider, info }] : [];
       })
     : [];
   return (
@@ -205,11 +206,9 @@ export function LiveActivitySection() {
           )}
         </p>
       </div>
-      {activeProviders.length ? (
+      {activeCards.length ? (
         <div className="live-cards">
-          {activeProviders.map((provider, index) => {
-            const info = details(provider, data!, stale);
-            if (!info) return null;
+          {activeCards.map(({ provider, info }, index) => {
             return (
               <Reveal
                 key={provider}
@@ -244,10 +243,7 @@ export function LiveActivitySection() {
                     </div>
                   </div>
                   {info.observedAt && (
-                    <time
-                      className="live-observed"
-                      dateTime={info.observedAt}
-                    >
+                    <time className="live-observed" dateTime={info.observedAt}>
                       Atividade em {displayTime(info.observedAt)}
                     </time>
                   )}
