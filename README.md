@@ -95,6 +95,35 @@ npx wrangler secret put DISCORD_WEBHOOK_URL --config worker/wrangler.jsonc --env
 
 Set the non-secret production Worker variable `SPOTIFY_AUTHORIZED_AT` to the current Spotify authorization time in ISO 8601 UTC, for example `2026-10-07T19:40:00Z`. The monitor still checks configured credentials if this timestamp is absent, but skips Spotify age notices until it is set. At day 173 it sends `⚠️ Spotify token expira em aproximadamente 7 dias`; at day 180 it sends `🚨 Spotify token deve estar expirado`. Invalid or revoked credentials for any configured provider are reported once and deduplicated in KV until that provider passes a later check.
 
+### Bootstrap do Simkl no PowerShell
+
+Para gerar a autorização inicial do Simkl no Windows sem gravar credenciais permanentemente no sistema, defina as variáveis apenas na sessão atual do PowerShell:
+
+```powershell
+$env:SIMKL_CLIENT_ID = "seu-client-id"
+$env:SIMKL_CLIENT_SECRET = "seu-client-secret"
+$env:SIMKL_REDIRECT_URI = "http://127.0.0.1:8888/callback"
+
+node --experimental-strip-types scripts/simkl-auth.ts
+```
+
+Essas variáveis existem somente no processo atual do PowerShell e nos processos filhos. Fechar o terminal remove os valores. Evite `setx` para este fluxo, pois ele persiste as variáveis no Windows.
+
+Para conferir as variáveis não sensíveis:
+
+```powershell
+$env:SIMKL_CLIENT_ID
+$env:SIMKL_REDIRECT_URI
+```
+
+Não imprima `SIMKL_CLIENT_SECRET` no terminal. Depois de finalizar a autorização, limpe explicitamente a sessão se o terminal continuar aberto:
+
+```powershell
+$env:SIMKL_CLIENT_ID = $null
+$env:SIMKL_CLIENT_SECRET = $null
+$env:SIMKL_REDIRECT_URI = $null
+```
+
 Provider setup and behavior:
 
 - **WakaTime:** [official API](https://wakatime.com/developers). API key remains server-side. Coding is active only with a heartbeat in the last five minutes; language/editor and today's minutes are normalized. Project name requires explicit opt-in.
