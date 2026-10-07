@@ -39,28 +39,72 @@ Cloudflare Pages serves extensionless HTML routes. Other static hosts should res
 
 Biome is the sole formatter/linter. The original repository had no ESLint, Prettier or `eslint-config-next` configuration to remove. TypeScript and the Next.js production build remain complementary validation. Biome's recommended rules cover JSX accessibility, React correctness and useful code diagnostics; Next-specific routing and static-export constraints are verified by the build and exported-route checks. The CSS `noDescendingSpecificity` rule is disabled because it flags unrelated elements in separate section scopes; reshuffling the existing responsive cascade would change its intended behavior. Reduced-motion CSS uses narrowly documented `!important` declarations to override animations reliably.
 
-## Cloudflare Pages deployment
+## Cloudflare deployment
 
-`.github/workflows/cloudflare-pages.yml` validates pull requests and pushes to `main`:
+`.github/workflows/cloudflare-pages.yml` runs Biome, frontend/Worker typechecks, Node tests, Worker dry-runs and the Next.js static build. Pages publishes the immutable `out/` artifact from that run. A deploy job checks out the same source to deploy the Worker, then publishes Pages; Worker failure prevents Pages publication.
 
-```text
-quality (Biome + TypeScript) ─┐
-                             ├─ build ─ immutable out/ artifact ─ deploy
- test (Node.js suite) ─┘
-```
+| Trigger | Destination | Pages branch |
+| --- | --- | --- |
+| Push to `main` or daily schedule | production | `main` |
+| PR opened/updated against `main` in this repository | preview | `pr-<number>` |
+| Run workflow → `preview` (default) | preview | `manual-<run-id>` |
+| Run workflow → `production` | production | `main`, using the selected source ref |
+| PR from a fork | checks/build only | none |
 
-The build job installs with `npm ci`, builds once, checks every required exported route and uploads `out/`. The deploy job downloads that same commit-named artifact and deploys it with the official Wrangler action. It does not check out or rebuild source. Only `main` can deploy production; pull requests only validate. Concurrency cancels superseded runs for the same branch. Actions use the maintained major versions verified against their official repositories when this workflow was added.
+Manual preview of `main` still publishes preview. Deployment is serialized per environment without canceling an active Worker/Pages publication. All previews share one preview Worker: a newer preview can change the BFF used by older preview sites. This is not an isolated backend per PR. Forks cannot receive GitHub secrets; review/import their branch into this repository to preview it. Never use `pull_request_target` to execute fork code with secrets.
 
 Before the first deployment:
 
-1. Create or select a Cloudflare Pages project and set its production branch to `main`.
-2. In GitHub **Settings → Secrets and variables → Actions**, set repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
-3. Add repository variable `CLOUDFLARE_PAGES_PROJECT` with the existing project's name.
-4. Use a Cloudflare API token with **Account → Cloudflare Pages → Edit**, restricted to the intended account. No zone, DNS or unrelated Workers permissions are required. Cloudflare's available Pages token scope applies at account level; it does not isolate one Pages project.
-5. If the project also has Cloudflare Git integration, disable its automatic builds to avoid a second independent deployment alongside this workflow.
-6. Push to `main` or run the workflow manually on `main`.
+1. Select the existing Pages project and keep its production branch set to `main`. Disable duplicate automatic builds if Cloudflare Git integration is also enabled.
+2. Set GitHub Actions secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. The token needs **Account → Cloudflare Pages → Edit** and **Account → Workers Scripts → Edit**, restricted to the intended account.
+3. Set GitHub Actions repository variable `CLOUDFLARE_PAGES_PROJECT` to that project's name.
+4. The workflow defaults to the account's `portfolio-activity-preview` and `portfolio-activity-production` Workers on `hugoalves-java.workers.dev`. If you use a different Workers subdomain or custom domain, set repository variables `ACTIVITY_API_URL_PREVIEW` and `ACTIVITY_API_URL_PRODUCTION` to the matching public HTTPS `/api/activity` URLs. These are public URLs, not secrets. CI embeds only the URL for the selected environment; production never falls back to preview.
+5. Provision provider credentials separately on each Worker as described below. Missing credentials show a provider fallback instead of failing the endpoint.
+6. Open/update a PR for preview, or use **Actions → Static Cloudflare Pages → Run workflow**, select the source ref, and choose `preview` or `production`. Production publishes exactly that ref's validated artifact. Deployment URLs appear in the run summary.
 
-Credentials belong only in GitHub secrets. Project names and account IDs must never be hardcoded into application code. Actual Cloudflare deployment requires these repository settings; local builds do not.
+Actual deployments require these settings and account access. Tests and dry-runs do not establish successful authentication to Cloudflare or provider accounts.
+
+## Live activity
+
+Section **06 — “O que estou fazendo agora?”** follows the GitHub timeline with WakaTime, Spotify, Simkl and Steam cards. The GitHub timeline remains section 05, “Além do código” is 07 and contact is 08. The frontend polls only the public Worker endpoint while the section and tab are visible, at 60-second intervals without overlapping requests. It shows skeletons, empty/disconnected/unavailable provider states, update time and a stale-data indicator after two minutes.
+
+`worker/src/index.ts` serves `GET /api/activity`; each adapter returns only normalized public activity. The Cache API stores that DTO for 60 seconds per Worker origin. Query strings do not create new cache entries. CORS is applied separately for each response, allowing the two portfolio domains and this project's Pages/preview domains. Localhost is allowed only for local development. CORS is not authentication; all returned activity is intentionally public.
+
+Configure Worker secrets interactively, with no credential values in source, command arguments, logs, `NEXT_PUBLIC_*` or static files:
+
+```bash
+npx wrangler secret put WAKATIME_API_KEY --config worker/wrangler.jsonc --env preview
+npx wrangler secret put SPOTIFY_CLIENT_ID --config worker/wrangler.jsonc --env preview
+npx wrangler secret put SPOTIFY_CLIENT_SECRET --config worker/wrangler.jsonc --env preview
+npx wrangler secret put SPOTIFY_REFRESH_TOKEN --config worker/wrangler.jsonc --env preview
+npx wrangler secret put SIMKL_CLIENT_ID --config worker/wrangler.jsonc --env preview
+npx wrangler secret put SIMKL_ACCESS_TOKEN --config worker/wrangler.jsonc --env preview
+npx wrangler secret put STEAM_API_KEY --config worker/wrangler.jsonc --env preview
+```
+
+Repeat with `--env production`. Use Cloudflare dashboard Worker settings to set `STEAM_ID` (17-digit ID) independently on each Worker. CI uses `--keep-vars` to retain dashboard variables and passes `PAGES_PROJECT` explicitly. `EXPOSE_CODING_PROJECT` is `false` by default; only enable it in the versioned environment configuration if your project name is safe to publish. Do not publish private file paths or branches.
+
+Provider setup and behavior:
+
+- **WakaTime:** [official API](https://wakatime.com/developers). API key remains server-side. Coding is active only with a heartbeat in the last five minutes; language/editor and today's minutes are normalized. Project name requires explicit opt-in.
+- **Spotify:** [official API](https://developer.spotify.com/documentation/web-api). Obtain your account's refresh token out of band with `user-read-currently-playing` and `user-read-recently-played` scopes. The Worker refreshes/reuses access tokens in memory and retries a 401 once. It shows recent tracks when nothing is playing. Reprovision expired/revoked refresh credentials as needed; the website does not provide an OAuth login or persistent token storage.
+- **Simkl:** [official API](https://api.simkl.org/) and [published schema](https://github.com/SIMKL/API). Authorize your own account out of band. The adapter checks `/sync/activities` before `/sync/all-items/`, using a rolling 30-day `date_from` and caching the normalized result in memory while activity is unchanged (at most one hour). Items older than this window may not appear. Activity is labeled recent rather than claiming current playback.
+- **Steam:** [GetPlayerSummaries](https://partner.steamgames.com/doc/webapi/ISteamUser) and [GetRecentlyPlayedGames](https://partner.steamgames.com/doc/webapi/IPlayerService), through the official public `api.steampowered.com` host. Current `gameid`/`gameextrainfo` takes precedence. Otherwise a game with most playtime in the last two weeks is labeled “Jogado recentemente”; the API does not establish the last game chronologically. Private profiles/Game Details and missing history show a fallback. No SteamDB or scraping.
+
+Run locally with an ignored `worker/.dev.vars` file containing your credentials and optional `STEAM_ID`, then `npm run worker:dev`. Set `NEXT_PUBLIC_ACTIVITY_API_URL=http://localhost:8787/api/activity` for `npm run dev`. The production build can leave the URL unset to show disconnected placeholders. The Worker uses only in-memory provider token/snapshot caches and the edge Cache API; no KV, D1, WebSocket or extra service is needed.
+
+Validation commands:
+
+```bash
+npm run ci
+npm run typecheck
+npm run typecheck:worker
+npm test
+npm run worker:check
+npm run build
+```
+
+Tests use injected fetch/cache/clock fixtures, including Spotify refresh/retry, provider outages, Steam privacy, CORS, cache TTL, abort/visibility, stale data and deployment selection/failure ordering. Browser checks at 375px and 1440px verify four cards, mobile navigation, section order, fallbacks, stale labels and reduced motion without overflow or page errors. Real provider authentication and cloud deployment need provisioned credentials and are not inferred from mocks.
 
 ## Motion and accessibility
 
