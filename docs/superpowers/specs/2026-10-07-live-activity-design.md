@@ -4,7 +4,7 @@
 
 Implementar a issue #1 do portfolioV3, incluindo a integração Steam solicitada no comentário https://github.com/vitorhugo-dotnet/portfolioV3/issues/1#issuecomment-6039440926, e a extensão solicitada para CI: preview automático de PRs e disparo manual com escolha entre produção e preview. Preservar Next.js com `output: "export"`, TypeScript, identidade visual japonesa e animações existentes. O desenho inicial foi aprovado em 07/10/2026.
 
-Hoje o frontend consulta eventos públicos do GitHub e a CI valida, testa e exporta o site. O workflow `.github/workflows/cloudflare-pages.yml` publica somente a branch main. A nova seção complementa a atividade do GitHub.
+Hoje o frontend consulta eventos públicos do GitHub e a CI valida, testa e exporta o site. O workflow `.github/workflows/cloudflare-pages.yml` publica somente a branch main. A nova seção 06, "O que estou fazendo agora?", aparece após a seção 05 de atividade do GitHub e antes de "Além do código".
 
 ## Arquitetura
 
@@ -38,7 +38,7 @@ Secrets do Worker: `WAKATIME_API_KEY`, `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECR
 
 ## Frontend
 
-Criar componente próprio com quatro cards integrado à seção de atividade existente, usando estilos responsivos e os componentes de reveal existentes. Respeitar movimento reduzido. Incluir skeleton, estado vazio, falha por provedor, indisponibilidade geral e endpoint não configurado. Não usar dados fictícios como atividade real.
+Criar uma seção própria 06 com título "O que estou fazendo agora?", ID `agora` e componente com quatro cards (WakaTime, Spotify, Simkl e Steam), usando estilos responsivos e os componentes de reveal existentes. Preservar a seção 05 "GitHub Activity" com sua timeline e filtros. Inserir a nova seção entre a atividade do GitHub e "Além do código"; renumerar "Além do código" para 07 e "Próximo capítulo" para 08. Adicionar o link "Agora" à navegação desktop/mobile e integrar o ID `agora` à detecção de seção ativa e ao scroll existentes. Respeitar movimento reduzido. Incluir skeleton, estado vazio, falha por provedor, indisponibilidade geral e endpoint não configurado. Não usar dados fictícios como atividade real.
 
 Atualizar a cada 60 segundos somente quando a aba e a seção estiverem visíveis, usando Page Visibility e IntersectionObserver. Abortar requests ao desmontar, impedir sobreposição e retomar ao voltar à seção. Mostrar horário da atualização e distinguir atividade atual de recente; marcar dados antigos após dois minutos sem atualização bem-sucedida.
 
@@ -58,6 +58,6 @@ Credenciais de deploy existentes permanecem no GitHub Secrets. Validar configura
 
 Testar integrações com fetch simulado: normalização, dados vazios, erros, timeout, renovação Spotify e falhas independentes. Para Steam, testar jogo atual, fallback recente sem indicação falsa de último jogo, perfil/Game Details privados, dados vazios, credenciais ausentes e erros; verificar que a chave e o Steam ID não aparecem no DTO. Testar roteamento, CORS, cache e ausência dos valores de secrets no DTO. Testar política de ambiente para PR, manual preview em main, manual production, push e schedule; forks não devem acessar deploy.
 
-Executar lint, typecheck, testes, build/export e dry-run do Worker. Verificar ausência de secrets de teste nos assets gerados e estados responsivos/acessíveis do componente. Documentar provisionamento de secrets, URLs públicas, escolha de ambiente, limitação dos forks e Worker preview compartilhado. Testes reais de provedores e deploy cloud dependem das credenciais provisionadas; não declarar essas integrações verificadas somente com mocks.
+Executar lint, typecheck, testes, build/export e dry-run do Worker. Verificar ausência de secrets de teste nos assets gerados e estados responsivos/acessíveis do componente. Verificar a ordem 05 GitHub → 06 "O que estou fazendo agora?" → 07 "Além do código" → 08 contato, a navegação por `#agora`, o destaque da seção ativa e a preservação da timeline GitHub. Documentar provisionamento de secrets, URLs públicas, escolha de ambiente, limitação dos forks e Worker preview compartilhado. Testes reais de provedores e deploy cloud dependem das credenciais provisionadas; não declarar essas integrações verificadas somente com mocks.
 
 Critérios de aceitação: todos os itens da issue #1, mais escolha manual de ambiente e preview automático de PRs do repositório. Entregar alterações em branch e PR para revisão, sem merge ou deploy de produção executado durante a implementação.
