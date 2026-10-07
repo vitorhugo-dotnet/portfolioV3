@@ -1,5 +1,10 @@
 import { collectActivity } from "./activity.ts";
-import type { Env, ProviderDependencies } from "./types.ts";
+import { runCredentialMonitor } from "./credential-monitor.ts";
+import type {
+  Env,
+  ProviderDependencies,
+  ScheduledControllerLike,
+} from "./types.ts";
 
 interface ActivityCache {
   match(request: Request): Promise<Response | undefined>;
@@ -104,5 +109,19 @@ export default {
       cache,
       collect: collectActivity,
     })(request, env, ctx);
+  },
+  scheduled(
+    _controller: ScheduledControllerLike,
+    env: Env,
+    ctx: Context,
+  ): void {
+    ctx.waitUntil(
+      runCredentialMonitor(env, {
+        fetch: (input, init) => globalThis.fetch(input, init),
+        now: Date.now,
+      }).catch(() => {
+        console.error("activity_monitor_error", { operation: "scheduled" });
+      }),
+    );
   },
 };

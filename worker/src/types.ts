@@ -26,6 +26,11 @@ export interface MonitorStateStore {
   put(key: string, value: string): Promise<void>;
   delete(key: string): Promise<void>;
 }
+export interface ScheduledControllerLike {
+  readonly scheduledTime: number;
+  readonly cron: string;
+  noRetry(): void;
+}
 export interface ProviderDependencies {
   fetch: typeof fetch;
   now: () => number;

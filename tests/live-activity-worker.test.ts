@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { LiveActivityResponse } from "../lib/live-activity.ts";
-import { createActivityHandler } from "../worker/src/index.ts";
+import worker, { createActivityHandler } from "../worker/src/index.ts";
+import type { Env, ScheduledControllerLike } from "../worker/src/types.ts";
 
 test("worker validates routes methods and exact CORS origins", async () => {
   const handler = createActivityHandler({
@@ -182,4 +183,70 @@ test("cache errors do not take down the endpoint", async () => {
   );
   await Promise.all(pending);
   assert.equal(response.status, 200);
+});
+
+test("scheduled worker runs credential monitoring with Worker bindings and clock", async () => {
+  type ScheduledWorker = typeof worker & {
+    scheduled?: (
+      controller: ScheduledControllerLike,
+      env: Env,
+      ctx: { waitUntil(promise: Promise<unknown>): void },
+    ) => void;
+  };
+  const scheduledWorker = worker as ScheduledWorker;
+  assert.equal(typeof scheduledWorker.scheduled, "function");
+  if (!scheduledWorker.scheduled) return;
+
+  const now = Date.parse("2026-10-07T12:00:00Z");
+  const currentDateNow = Date.now;
+  Date.now = () => now;
+  const stored = new Map<string, string>();
+  const state = {
+    get: async (key: string) => stored.get(key) ?? null,
+    put: async (key: string, value: string) => {
+      stored.set(key, value);
+    },
+    delete: async (key: string) => {
+      stored.delete(key);
+    },
+  };
+  const calls: URL[] = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (input) => {
+    const url = new URL(String(input));
+    calls.push(url);
+    if (url.hostname === "accounts.spotify.com")
+      return Response.json({ access_token: "token", expires_in: 3600 });
+    if (url.hostname === "discord.com")
+      return new Response(null, { status: 204 });
+    return Response.json({ data: { id: "valid" } });
+  }) as typeof fetch;
+  const env: Env = {
+    ACTIVITY_MONITOR_ENABLED: "true",
+    ACTIVITY_MONITOR_STATE: state,
+    DISCORD_WEBHOOK_URL:
+      "https://discord.com/api/webhooks/123456/webhook-token",
+    SPOTIFY_CLIENT_ID: "client",
+    SPOTIFY_CLIENT_SECRET: "secret",
+    SPOTIFY_REFRESH_TOKEN: "refresh",
+    SPOTIFY_AUTHORIZED_AT: new Date(now - 173 * 86400000).toISOString(),
+  };
+  const pending: Promise<unknown>[] = [];
+  try {
+    scheduledWorker.scheduled(
+      { scheduledTime: now, cron: "0 6 * * *", noRetry: () => {} },
+      env,
+      { waitUntil: (promise) => pending.push(promise) },
+    );
+    await Promise.all(pending);
+  } finally {
+    globalThis.fetch = originalFetch;
+    Date.now = currentDateNow;
+  }
+  assert.ok(calls.some((url) => url.hostname === "accounts.spotify.com"));
+  assert.ok(calls.some((url) => url.hostname === "discord.com"));
+  assert.equal(
+    stored.get("activity-monitor:spotify-age"),
+    `${env.SPOTIFY_AUTHORIZED_AT}:warning`,
+  );
 });

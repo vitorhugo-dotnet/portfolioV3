@@ -84,6 +84,16 @@ npx wrangler secret put STEAM_API_KEY --config worker/wrangler.jsonc --env previ
 
 Repeat with `--env production`. Use Cloudflare dashboard Worker settings to set `STEAM_ID` (17-digit ID) independently on each Worker. CI uses `--keep-vars` to retain dashboard variables and passes `PAGES_PROJECT` explicitly. `EXPOSE_CODING_PROJECT` is `false` by default; only enable it in the versioned environment configuration if your project name is safe to publish. Do not publish private file paths or branches.
 
+Production also has a daily credential monitor at 06:00 UTC. It probes each configured WakaTime, Spotify, Simkl, and Steam credential; only authentication failures alert, while timeouts, rate limits, and provider outages stay transient. The production KV namespace `ACTIVITY_MONITOR_STATE_PRODUCTION` is provisioned and bound as `ACTIVITY_MONITOR_STATE` in `worker/wrangler.jsonc`. If deploying to a different Cloudflare account, create a KV namespace with `npx wrangler kv namespace create ACTIVITY_MONITOR_STATE_PRODUCTION` and replace the production binding's `id` with the returned namespace ID. Preview has no cron and monitoring is disabled there.
+
+Set the production `DISCORD_WEBHOOK_URL` as a Worker secret using the dashboard or interactively:
+
+```bash
+npx wrangler secret put DISCORD_WEBHOOK_URL --config worker/wrangler.jsonc --env production
+```
+
+Set the non-secret production Worker variable `SPOTIFY_AUTHORIZED_AT` to the current Spotify authorization time in ISO 8601 UTC, for example `2026-10-07T19:40:00Z`. The monitor still checks configured credentials if this timestamp is absent, but skips Spotify age notices until it is set. At day 173 it sends `⚠️ Spotify token expira em aproximadamente 7 dias`; at day 180 it sends `🚨 Spotify token deve estar expirado`. Invalid or revoked credentials for any configured provider are reported once and deduplicated in KV until that provider passes a later check.
+
 Provider setup and behavior:
 
 - **WakaTime:** [official API](https://wakatime.com/developers). API key remains server-side. Coding is active only with a heartbeat in the last five minutes; language/editor and today's minutes are normalized. Project name requires explicit opt-in.

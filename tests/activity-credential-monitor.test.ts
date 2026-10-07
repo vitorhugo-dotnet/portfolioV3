@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { mock, test } from "node:test";
 import { runCredentialMonitor } from "../worker/src/credential-monitor.ts";
 import { probeActivityCredentials } from "../worker/src/credential-probes.ts";
@@ -51,6 +52,25 @@ const monitorConfig = {
   ACTIVITY_MONITOR_ENABLED: "true",
   DISCORD_WEBHOOK_URL: "https://discord.com/api/webhooks/123456/token-secret",
 };
+
+test("only production binds KV and schedules the daily monitor", async () => {
+  const config = JSON.parse(
+    await readFile(
+      new URL("../worker/wrangler.jsonc", import.meta.url),
+      "utf8",
+    ),
+  );
+  assert.equal(config.env.production.vars.ACTIVITY_MONITOR_ENABLED, "true");
+  assert.deepEqual(config.env.production.triggers.crons, ["0 6 * * *"]);
+  assert.equal(
+    config.env.production.kv_namespaces[0].binding,
+    "ACTIVITY_MONITOR_STATE",
+  );
+  assert.ok(config.env.production.kv_namespaces[0].id);
+  assert.equal(config.env.preview.vars.ACTIVITY_MONITOR_ENABLED, "false");
+  assert.deepEqual(config.env.preview.triggers.crons, []);
+  assert.deepEqual(config.env.preview.kv_namespaces, []);
+});
 
 test("credential probes authenticate to each official provider using minimal endpoints", async () => {
   const requests: Array<{ url: URL; init?: RequestInit }> = [];
@@ -218,6 +238,9 @@ test("invalid credential alerts are deduplicated until a later valid probe", asy
   } as Env;
   const deps = dependencies((url, init) => {
     if (url.hostname === "discord.com") {
+      assert.equal(url.searchParams.get("wait"), "true");
+      const body = JSON.parse(String(init?.body));
+      assert.deepEqual(body.allowed_mentions, { parse: [] });
       messages.push(String(JSON.parse(String(init?.body)).content));
       return new Response(null, { status: 204 });
     }
@@ -388,6 +411,16 @@ test("disabled or incomplete monitor configuration makes no network requests", a
     deps,
   );
   await runCredentialMonitor({ ...credentials, ...monitorConfig }, deps);
+  await runCredentialMonitor(
+    {
+      ...credentials,
+      ACTIVITY_MONITOR_ENABLED: "true",
+      DISCORD_WEBHOOK_URL:
+        "https://attacker.example/api/webhooks/123456/secret",
+      ACTIVITY_MONITOR_STATE: state,
+    },
+    deps,
+  );
   assert.equal(requests, 0);
 });
 

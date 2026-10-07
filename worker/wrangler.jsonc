@@ -19,7 +19,17 @@
       "vars": {
         "DEVELOPMENT": "false",
         "ALLOWED_ORIGINS": "https://hugojava.dev,https://hugodotnet.dev",
-        "EXPOSE_CODING_PROJECT": "false"
+        "EXPOSE_CODING_PROJECT": "false",
+        "ACTIVITY_MONITOR_ENABLED": "true"
+      },
+      "kv_namespaces": [
+        {
+          "binding": "ACTIVITY_MONITOR_STATE",
+          "id": "41b0fdba488a46a392cd3764d50eb24b"
+        }
+      ],
+      "triggers": {
+        "crons": ["0 6 * * *"]
       }
     },
     "preview": {
@@ -31,7 +41,12 @@
       "vars": {
         "DEVELOPMENT": "false",
         "ALLOWED_ORIGINS": "https://hugojava.dev,https://hugodotnet.dev",
-        "EXPOSE_CODING_PROJECT": "false"
+        "EXPOSE_CODING_PROJECT": "false",
+        "ACTIVITY_MONITOR_ENABLED": "false"
+      },
+      "kv_namespaces": [],
+      "triggers": {
+        "crons": []
       }
     }
   }
