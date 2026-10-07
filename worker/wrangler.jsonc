@@ -4,6 +4,12 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-10-07",
   "workers_dev": true,
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["SimklTokenStore"]
+    }
+  ],
   "vars": {
     "DEVELOPMENT": "true",
     "ALLOWED_ORIGINS": "https://hugojava.dev,https://hugodotnet.dev",
@@ -28,6 +34,14 @@
           "id": "41b0fdba488a46a392cd3764d50eb24b"
         }
       ],
+      "durable_objects": {
+        "bindings": [
+          {
+            "name": "SIMKL_TOKEN_STORE",
+            "class_name": "SimklTokenStore"
+          }
+        ]
+      },
       "triggers": {
         "crons": ["0 6 * * *"]
       }
@@ -45,6 +59,14 @@
         "ACTIVITY_MONITOR_ENABLED": "false"
       },
       "kv_namespaces": [],
+      "durable_objects": {
+        "bindings": [
+          {
+            "name": "SIMKL_TOKEN_STORE",
+            "class_name": "SimklTokenStore"
+          }
+        ]
+      },
       "triggers": {
         "crons": []
       }

@@ -9,7 +9,10 @@ export interface Env {
   SPOTIFY_CLIENT_SECRET?: string;
   SPOTIFY_REFRESH_TOKEN?: string;
   SIMKL_CLIENT_ID?: string;
+  SIMKL_CLIENT_SECRET?: string;
+  SIMKL_REFRESH_TOKEN?: string;
   SIMKL_ACCESS_TOKEN?: string;
+  SIMKL_TOKEN_STORE?: SimklTokenStoreNamespace;
   STEAM_API_KEY?: string;
   STEAM_ID?: string;
   ALLOWED_ORIGINS?: string;
@@ -25,6 +28,12 @@ export interface MonitorStateStore {
   get(key: string): Promise<string | null>;
   put(key: string, value: string): Promise<void>;
   delete(key: string): Promise<void>;
+}
+export interface SimklTokenStoreNamespace {
+  idFromName(name: string): unknown;
+  get(id: unknown): {
+    fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>;
+  };
 }
 export interface ScheduledControllerLike {
   readonly scheduledTime: number;

@@ -346,6 +346,45 @@ test("Simkl checks last activity and returns only sanitized recent history", asy
   assert.equal(result.data?.isActive, true);
   assert.ok(!JSON.stringify(result).includes("simkl-secret"));
 });
+test("Simkl refreshes a rejected AUTH V2 access token once and retries the request", async () => {
+  let currentAccessToken = "expired-access-token";
+  const oauthRequests: boolean[] = [];
+  let rejectedRequestCount = 0;
+  const env = {
+    SIMKL_CLIENT_ID: "client",
+    SIMKL_CLIENT_SECRET: "secret",
+    SIMKL_REFRESH_TOKEN: "refresh-token",
+    SIMKL_TOKEN_STORE: {
+      idFromName: (name: string) => name,
+      get: () => ({
+        fetch: async (input: RequestInfo | URL) => {
+          const request = input instanceof Request ? input : new Request(input);
+          const body = (await request.json()) as { force?: boolean };
+          oauthRequests.push(body.force === true);
+          if (body.force) currentAccessToken = "rotated-access-token";
+          return Response.json({ access_token: currentAccessToken });
+        },
+      }),
+    },
+  };
+  const result = await getSimkl(env, {
+    now: () => now,
+    fetch: async (input, init) => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith("activities") && rejectedRequestCount++ === 0)
+        return Response.json({ error: "invalid_token" }, { status: 401 });
+      assert.equal(
+        new Headers(init?.headers).get("Authorization"),
+        "Bearer rotated-access-token",
+      );
+      if (url.pathname.endsWith("history")) return Response.json([]);
+      return Response.json({ all: "2026-10-07T11:59:00Z" });
+    },
+  });
+  assert.equal(result.state, "empty");
+  assert.deepEqual(oauthRequests, [false, true]);
+  assert.equal(rejectedRequestCount, 2);
+});
 test("Simkl marks history idle after 40 minutes and does not cache active status", async () => {
   const env = { SIMKL_CLIENT_ID: "aging", SIMKL_ACCESS_TOKEN: "token" };
   const d = deps((url) =>

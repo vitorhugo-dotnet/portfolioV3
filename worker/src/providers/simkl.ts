@@ -7,6 +7,7 @@ import {
   timestamp,
 } from "../provider-http.ts";
 import { simklApiRequest } from "../simkl-http.ts";
+import { getSimklAccessToken } from "../simkl-oauth.ts";
 import type { Env, ProviderDependencies, ProviderResult } from "../types.ts";
 
 const snapshots = new WeakMap<
@@ -23,21 +24,43 @@ export async function getSimkl(
   deps: ProviderDependencies,
 ): Promise<ProviderResult<"simkl">> {
   const clientId = env.SIMKL_CLIENT_ID;
-  const accessToken = env.SIMKL_ACCESS_TOKEN;
-  if (!clientId || !accessToken) return { state: "unconfigured" };
+  if (
+    !clientId ||
+    (!env.SIMKL_ACCESS_TOKEN &&
+      !(env.SIMKL_REFRESH_TOKEN && env.SIMKL_TOKEN_STORE))
+  )
+    return { state: "unconfigured" };
   try {
+    let accessToken = await getSimklAccessToken(env);
+    const fetchSimklJson = async (url: URL): Promise<unknown> => {
+      const request = () => simklApiRequest(url, clientId, accessToken);
+      const currentRequest = request();
+      try {
+        return await fetchProviderJson(
+          currentRequest.url,
+          { headers: currentRequest.headers },
+          deps,
+        );
+      } catch (error) {
+        if (
+          !(error instanceof ProviderHttpError) ||
+          error.status !== 401 ||
+          !env.SIMKL_REFRESH_TOKEN ||
+          !env.SIMKL_TOKEN_STORE
+        )
+          throw error;
+        accessToken = await getSimklAccessToken(env, { force: true });
+        const retryRequest = request();
+        return fetchProviderJson(
+          retryRequest.url,
+          { headers: retryRequest.headers },
+          deps,
+        );
+      }
+    };
     const identity = JSON.stringify([clientId, accessToken]);
-    const activityRequest = simklApiRequest(
-      new URL("https://api.simkl.com/sync/activities"),
-      clientId,
-      accessToken,
-    );
     const activity = record(
-      await fetchProviderJson(
-        activityRequest.url,
-        { headers: activityRequest.headers },
-        deps,
-      ),
+      await fetchSimklJson(new URL("https://api.simkl.com/sync/activities")),
     );
     const marker = JSON.stringify(activity);
     const cached = snapshots.get(deps.fetch);
@@ -78,12 +101,7 @@ export async function getSimkl(
           new Date(deps.now() - 30 * 86400000).toISOString(),
         );
         url.searchParams.set("limit", "100");
-        const historyRequest = simklApiRequest(url, clientId, accessToken);
-        const raw = await fetchProviderJson(
-          historyRequest.url,
-          { headers: historyRequest.headers },
-          deps,
-        );
+        const raw = await fetchSimklJson(url);
         if (raw === null) return { mediaType, contentKey, entries: [] };
         if (!Array.isArray(raw)) throw Error("Invalid Simkl history");
         return { mediaType, contentKey, entries: raw };

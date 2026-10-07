@@ -1,4 +1,5 @@
 import { simklApiRequest } from "./simkl-http.ts";
+import { getSimklAccessToken, SimklTokenError } from "./simkl-oauth.ts";
 import { refreshSpotifyToken, SpotifyTokenError } from "./spotify-token.ts";
 import type {
   CredentialProbeResult,
@@ -85,16 +86,43 @@ async function probeSimkl(
   env: Env,
   deps: ProviderDependencies,
 ): Promise<CredentialProbeResult> {
-  if (!env.SIMKL_CLIENT_ID || !env.SIMKL_ACCESS_TOKEN)
+  if (
+    !env.SIMKL_CLIENT_ID ||
+    (!env.SIMKL_ACCESS_TOKEN &&
+      !(env.SIMKL_REFRESH_TOKEN && env.SIMKL_TOKEN_STORE))
+  )
     return { state: "unconfigured" };
-  const request = simklApiRequest(
-    new URL("https://api.simkl.com/sync/activities"),
-    env.SIMKL_CLIENT_ID,
-    env.SIMKL_ACCESS_TOKEN,
-  );
-  return probeJson(request.url, { headers: request.headers }, deps, (payload) =>
-    Boolean(payload && typeof payload === "object" && !Array.isArray(payload)),
-  );
+  const url = new URL("https://api.simkl.com/sync/activities");
+  const validate = (payload: unknown) =>
+    Boolean(payload && typeof payload === "object" && !Array.isArray(payload));
+  const run = async (force = false) => {
+    const accessToken = await getSimklAccessToken(env, { force });
+    const request = simklApiRequest(
+      url,
+      env.SIMKL_CLIENT_ID as string,
+      accessToken,
+    );
+    return probeJson(request.url, { headers: request.headers }, deps, validate);
+  };
+
+  try {
+    const result = await run();
+    if (
+      result.state === "invalid" &&
+      env.SIMKL_REFRESH_TOKEN &&
+      env.SIMKL_TOKEN_STORE
+    )
+      return await run(true);
+    return result;
+  } catch (error) {
+    if (error instanceof SimklTokenError) {
+      if (error.code === "invalid_grant")
+        return { state: "invalid", reason: "invalid_token" };
+      if (error.code === "invalid_client")
+        return { state: "invalid", reason: "invalid_client" };
+    }
+    return { state: "transient", reason: "provider_error" };
+  }
 }
 
 async function probeSteam(

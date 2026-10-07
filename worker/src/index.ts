@@ -6,6 +6,8 @@ import type {
   ScheduledControllerLike,
 } from "./types.ts";
 
+export { SimklTokenStore } from "./simkl-oauth.ts";
+
 interface ActivityCache {
   match(request: Request): Promise<Response | undefined>;
   put(request: Request, response: Response): Promise<void>;
