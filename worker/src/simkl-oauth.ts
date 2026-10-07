@@ -8,6 +8,7 @@ export interface SimklStoredTokens {
   accessToken: string;
   refreshToken: string;
   expiresAt: number;
+  refreshExpiresAt?: number;
 }
 
 export interface SimklTokenStorage {
@@ -119,10 +120,12 @@ export async function refreshSimklAccessToken(
     )
       throw new SimklTokenError("provider_error", 502);
 
+    const refreshedAt = deps.now();
     const next: SimklStoredTokens = {
       accessToken: result.access_token,
       refreshToken: result.refresh_token,
-      expiresAt: deps.now() + result.expires_in * 1000,
+      expiresAt: refreshedAt + result.expires_in * 1000,
+      refreshExpiresAt: refreshedAt + 180 * 86400000,
     };
     await storage.put(TOKEN_STATE_KEY, next);
     return next.accessToken;
@@ -176,6 +179,52 @@ export async function getSimklAccessToken(
   throw new SimklTokenError("unconfigured", 503);
 }
 
+export async function getSimklRefreshExpiry(
+  env: Env,
+): Promise<number | undefined> {
+  if (!env.SIMKL_REFRESH_TOKEN || !env.SIMKL_TOKEN_STORE) return undefined;
+  const id = env.SIMKL_TOKEN_STORE.idFromName("simkl-token-store");
+  const stub = env.SIMKL_TOKEN_STORE.get(id);
+  const response = await stub.fetch(
+    new Request("https://simkl-token-store/refresh-status"),
+  );
+  let payload: unknown;
+  try {
+    payload = await response.json();
+  } catch {
+    throw new SimklTokenError("provider_error", response.status || 502);
+  }
+  if (!response.ok) {
+    const code =
+      payload && typeof payload === "object" && !Array.isArray(payload)
+        ? oauthErrorCode((payload as Record<string, unknown>).error)
+        : "provider_error";
+    throw new SimklTokenError(code, response.status);
+  }
+  if (
+    !payload ||
+    typeof payload !== "object" ||
+    Array.isArray(payload) ||
+    !("refresh_expires_at" in payload)
+  )
+    throw new SimklTokenError("provider_error", 502);
+  const expiry = (payload as Record<string, unknown>).refresh_expires_at;
+  return typeof expiry === "number" && Number.isFinite(expiry)
+    ? expiry
+    : undefined;
+}
+
+export function simklRefreshAgeStage(
+  refreshExpiresAt: number | undefined,
+  now: number,
+): "warning" | "expired" | undefined {
+  if (refreshExpiresAt === undefined || !Number.isFinite(refreshExpiresAt))
+    return undefined;
+  if (now >= refreshExpiresAt) return "expired";
+  if (now >= refreshExpiresAt - 7 * 86400000) return "warning";
+  return undefined;
+}
+
 export class SimklTokenStore {
   private state: SimklTokenStateLike;
   private env: Env;
@@ -191,6 +240,17 @@ export class SimklTokenStore {
 
   private async handle(request: Request): Promise<Response> {
     const url = new URL(request.url);
+    if (url.pathname === "/refresh-status") {
+      if (request.method !== "GET")
+        return Response.json({ error: "method_not_allowed" }, { status: 405 });
+      const current = storedTokens(
+        await this.state.storage.get<unknown>(TOKEN_STATE_KEY),
+      );
+      return Response.json(
+        { refresh_expires_at: current?.refreshExpiresAt ?? null },
+        { headers: { "Cache-Control": "no-store" } },
+      );
+    }
     if (url.pathname !== "/access-token")
       return Response.json({ error: "not_found" }, { status: 404 });
     if (request.method !== "POST")

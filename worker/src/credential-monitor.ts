@@ -1,4 +1,5 @@
 import { probeActivityCredentials } from "./credential-probes.ts";
+import { getSimklRefreshExpiry, simklRefreshAgeStage } from "./simkl-oauth.ts";
 import { spotifyAgeStage } from "./spotify-token.ts";
 import type { Env, ProviderDependencies } from "./types.ts";
 
@@ -116,11 +117,25 @@ export async function runCredentialMonitor(
   if (env.ACTIVITY_MONITOR_ENABLED !== "true" || !webhook || !state) return;
 
   const results = await probeActivityCredentials(env, deps);
+  let simklRefreshExpiry: number | undefined;
+  try {
+    simklRefreshExpiry = await getSimklRefreshExpiry(env);
+  } catch {
+    // Token-age alerts are best-effort; credential probes report auth failures.
+  }
+  const simklAgeStage = simklRefreshAgeStage(simklRefreshExpiry, deps.now());
   for (const provider of ["coding", "spotify", "simkl", "steam"] as const) {
     const result = results[provider];
     if (result.state === "valid") {
       await clearInvalidState(env, provider);
-    } else if (result.state === "invalid") {
+    } else if (
+      result.state === "invalid" &&
+      !(
+        provider === "simkl" &&
+        result.reason === "invalid_token" &&
+        simklAgeStage === "expired"
+      )
+    ) {
       await notifyOnce(
         env,
         deps,
@@ -137,17 +152,39 @@ export async function runCredentialMonitor(
     spotify.state === "valid"
       ? spotifyAgeStage(env.SPOTIFY_AUTHORIZED_AT, deps.now())
       : undefined;
-  if (!ageStage || !env.SPOTIFY_AUTHORIZED_AT) return;
-  const message =
-    ageStage === "warning"
-      ? "⚠️ Spotify token expira em aproximadamente 7 dias"
-      : "🚨 Spotify token deve estar expirado";
+  if (ageStage && env.SPOTIFY_AUTHORIZED_AT) {
+    const message =
+      ageStage === "warning"
+        ? "⚠️ Spotify token expira em aproximadamente 7 dias"
+        : "🚨 Spotify token deve estar expirado";
+    await notifyOnce(
+      env,
+      deps,
+      webhook,
+      "activity-monitor:spotify-age",
+      `${env.SPOTIFY_AUTHORIZED_AT}:${ageStage}`,
+      message,
+    );
+  }
+
+  if (!simklAgeStage || simklRefreshExpiry === undefined) return;
+  const simkl = results.simkl;
+  if (
+    simkl.state === "unconfigured" ||
+    (simkl.state === "invalid" &&
+      (simklAgeStage !== "expired" || simkl.reason !== "invalid_token"))
+  )
+    return;
+  const simklAgeMessage =
+    simklAgeStage === "warning"
+      ? "⚠️ Simkl refresh token expira em aproximadamente 7 dias"
+      : "🚨 Simkl refresh token expirou. Reautorize para restaurar a atividade.";
   await notifyOnce(
     env,
     deps,
     webhook,
-    "activity-monitor:spotify-age",
-    `${env.SPOTIFY_AUTHORIZED_AT}:${ageStage}`,
-    message,
+    "activity-monitor:simkl-refresh-age",
+    `${simklRefreshExpiry}:${simklAgeStage}`,
+    simklAgeMessage,
   );
 }

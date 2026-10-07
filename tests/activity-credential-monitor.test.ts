@@ -349,6 +349,55 @@ test("Spotify age alerts use exact messages and deduplicate per timestamp and st
   assert.equal(messages[1], "🚨 Spotify token deve estar expirado");
 });
 
+test("Simkl refresh expiry alerts use seven-day and expired stages with deduplication", async () => {
+  const messages: string[] = [];
+  const { state } = memoryState();
+  let refreshExpiresAt = now + 7 * 86400000;
+  let simklTokenExpired = false;
+  const env = {
+    ...monitorConfig,
+    SIMKL_CLIENT_ID: "simkl-age-check",
+    SIMKL_REFRESH_TOKEN: "refresh",
+    SIMKL_TOKEN_STORE: {
+      idFromName: (name: string) => name,
+      get: () => ({
+        fetch: async (input: RequestInfo | URL) => {
+          const request = input instanceof Request ? input : new Request(input);
+          const path = new URL(request.url).pathname;
+          if (path === "/refresh-status")
+            return Response.json({ refresh_expires_at: refreshExpiresAt });
+          if (simklTokenExpired)
+            return Response.json({ error: "invalid_grant" }, { status: 400 });
+          return Response.json({ access_token: "access" });
+        },
+      }),
+    },
+    ACTIVITY_MONITOR_STATE: state,
+  } as Env;
+  const deps = dependencies((url, init) => {
+    if (url.hostname === "discord.com") {
+      messages.push(String(JSON.parse(String(init?.body)).content));
+      return new Response(null, { status: 204 });
+    }
+    return { all: new Date(now - 60000).toISOString() };
+  });
+
+  await runCredentialMonitor(env, deps);
+  await runCredentialMonitor(env, deps);
+  assert.deepEqual(messages, [
+    "⚠️ Simkl refresh token expira em aproximadamente 7 dias",
+  ]);
+
+  refreshExpiresAt = now;
+  simklTokenExpired = true;
+  await runCredentialMonitor(env, deps);
+  await runCredentialMonitor(env, deps);
+  assert.deepEqual(messages, [
+    "⚠️ Simkl refresh token expira em aproximadamente 7 dias",
+    "🚨 Simkl refresh token expirou. Reautorize para restaurar a atividade.",
+  ]);
+});
+
 test("transient Spotify errors never produce a false expiration notice", async () => {
   const messages: string[] = [];
   const { state } = memoryState();

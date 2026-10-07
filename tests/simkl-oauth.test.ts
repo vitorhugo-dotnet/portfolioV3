@@ -2,8 +2,11 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   getSimklAccessToken,
+  getSimklRefreshExpiry,
   refreshSimklAccessToken,
   SimklTokenError,
+  SimklTokenStore,
+  simklRefreshAgeStage,
 } from "../worker/src/simkl-oauth.ts";
 import type { Env } from "../worker/src/types.ts";
 
@@ -51,7 +54,66 @@ test("AUTH V2 refresh persists its token pair and caches the access token", asyn
     accessToken: "new-access-token",
     refreshToken: "rotated-refresh-token",
     expiresAt: now + 604800000,
+    refreshExpiresAt: now + 180 * 86400000,
   });
+});
+
+test("Simkl refresh age alerts start at seven days remaining and at expiry", () => {
+  const day = 86400000;
+  for (const [remaining, expected] of [
+    [7 * day + 1, undefined],
+    [7 * day, "warning"],
+    [1, "warning"],
+    [0, "expired"],
+    [-1, "expired"],
+  ] as const) {
+    assert.equal(simklRefreshAgeStage(now + remaining, now), expected);
+  }
+  assert.equal(simklRefreshAgeStage(undefined, now), undefined);
+});
+
+test("Simkl Durable Object exposes refresh expiry without returning tokens", async () => {
+  const storage = new MemoryStorage();
+  storage.values.set("simkl-oauth", {
+    accessToken: "private-access",
+    refreshToken: "private-refresh",
+    expiresAt: now + 1,
+    refreshExpiresAt: now + 180 * 86400000,
+  });
+  const store = new SimklTokenStore(
+    {
+      storage,
+      blockConcurrencyWhile: (callback) => callback(),
+    },
+    env,
+  );
+  const result = await store.fetch(
+    new Request("https://simkl-token-store/refresh-status"),
+  );
+  const payload = await result.json();
+  assert.deepEqual(payload, {
+    refresh_expires_at: now + 180 * 86400000,
+  });
+  assert.equal(JSON.stringify(payload).includes("private"), false);
+});
+
+test("Worker reads only the Simkl refresh expiry from the Durable Object", async () => {
+  const envWithStore: Env = {
+    ...env,
+    SIMKL_TOKEN_STORE: {
+      idFromName: (name) => name,
+      get: () => ({
+        fetch: async (input) => {
+          assert.equal(
+            input instanceof Request ? new URL(input.url).pathname : "",
+            "/refresh-status",
+          );
+          return Response.json({ refresh_expires_at: now + 20 });
+        },
+      }),
+    },
+  };
+  assert.equal(await getSimklRefreshExpiry(envWithStore), now + 20);
 });
 
 test("AUTH V2 refresh uses its stored refresh token after bootstrap", async () => {
