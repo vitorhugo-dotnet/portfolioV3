@@ -4,3 +4,7 @@ out/
 dist/
 next-env.d.ts
 *.tsbuildinfo
+work/
+.wrangler/
+.dev.vars*
+.env*
