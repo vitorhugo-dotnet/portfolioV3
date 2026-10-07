@@ -1409,6 +1409,142 @@ fieldset.activity-tabs {
   margin: auto 0;
   max-width: 20rem;
 }
+.live-standby {
+  position: relative;
+  overflow: hidden;
+  padding: clamp(1.25rem, 3vw, 2.5rem);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background:
+    radial-gradient(ellipse at 83% 100%, rgb(255 91 74 / 8%), transparent 34%),
+    linear-gradient(140deg, #10161d, #0c1117 72%);
+}
+.live-standby-content {
+  position: relative;
+  z-index: 1;
+}
+.live-standby-heading {
+  margin-bottom: 1.5rem;
+}
+.live-standby-label {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0 0 0.8rem;
+  color: var(--red);
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+}
+.live-standby-indicator {
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid var(--red);
+  border-radius: 50%;
+  position: relative;
+}
+.live-standby-indicator::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: var(--red);
+  box-shadow: 0 0 12px var(--red);
+}
+.live-standby-heading h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: clamp(1.35rem, 2.4vw, 2rem);
+  letter-spacing: -0.04em;
+}
+.live-standby-heading > p:last-child {
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+}
+.live-standby-statuses {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+.live-standby-status {
+  min-width: 0;
+  min-height: 5.75rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: linear-gradient(145deg, #17171b, #121820 72%, #20191c);
+}
+.live-standby-icon {
+  min-width: 2.25rem;
+  padding-right: 1rem;
+  border-right: 1px solid var(--line);
+  color: var(--red);
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 1.2rem;
+  text-align: center;
+}
+.live-standby-service {
+  min-width: 0;
+  display: grid;
+  gap: 0.35rem;
+  color: var(--muted);
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 0.7rem;
+  letter-spacing: 0.15em;
+}
+.live-standby-state {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--ink);
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.85rem;
+  letter-spacing: 0;
+}
+.live-standby-state i {
+  width: 0.65rem;
+  height: 0.65rem;
+  border: 1px solid var(--muted);
+  border-radius: 50%;
+}
+.live-standby-more {
+  margin-left: auto;
+  color: var(--muted);
+  letter-spacing: 0.2em;
+}
+.live-standby-signal {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin: 1.1rem 0 0;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+}
+.live-standby-signal span {
+  color: var(--muted);
+  font-size: 1rem;
+}
+.live-standby-pattern {
+  position: absolute;
+  inset-block: 10%;
+  right: 2%;
+  width: 24%;
+  background-image: radial-gradient(
+    rgb(102 148 180 / 30%) 1px,
+    transparent 1px
+  );
+  background-size: 20px 20px;
+  mask-image: linear-gradient(90deg, transparent, #000 35%);
+  pointer-events: none;
+}
 .live-skeleton {
   display: grid;
   gap: 0.8rem;
@@ -1450,6 +1586,16 @@ fieldset.activity-tabs {
   }
   .live-cards {
     grid-template-columns: 1fr;
+  }
+  .live-standby-statuses {
+    grid-template-columns: 1fr;
+    gap: 0.65rem;
+  }
+  .live-standby-status {
+    min-height: 4.5rem;
+  }
+  .live-standby-pattern {
+    width: 42%;
   }
   .live-card {
     padding: 1.25rem;

@@ -111,6 +111,109 @@ function displayTime(value: string) {
   });
 }
 
+function standbySignal(data: LiveActivityResponse) {
+  const observations = [
+    data.coding?.observedAt,
+    data.spotify?.observedAt,
+    data.simkl?.observedAt,
+    data.steam?.observedAt,
+  ].filter((value): value is string => Boolean(value));
+  return observations.sort((a, b) => Date.parse(b) - Date.parse(a))[0];
+}
+
+function providerIdleState(
+  state: LiveActivityResponse["providerStates"][Provider],
+  idleLabel: string,
+) {
+  if (state === "unconfigured") return "offline";
+  if (state === "unavailable") return "sem sinal";
+  return idleLabel;
+}
+
+function StandbyPanel({
+  data,
+  now,
+}: {
+  data: LiveActivityResponse;
+  now: number;
+}) {
+  const watchingStates = [data.providerStates.simkl, data.providerStates.steam];
+  const watchingStatus = watchingStates.every(
+    (state) => state === "unconfigured",
+  )
+    ? "offline"
+    : watchingStates.some(
+          (state) => state !== "unconfigured" && state !== "unavailable",
+        )
+      ? "idle"
+      : "sem sinal";
+  const latestSignal = standbySignal(data);
+  const elapsedMinutes = latestSignal
+    ? Math.max(0, Math.floor((now - Date.parse(latestSignal)) / 60000))
+    : undefined;
+  const signalLabel =
+    elapsedMinutes === undefined
+      ? "sem sinal anterior"
+      : elapsedMinutes < 1
+        ? "agora"
+        : `há ${elapsedMinutes} min`;
+  const statuses = [
+    {
+      icon: "</>",
+      label: "CODE",
+      state: providerIdleState(data.providerStates.coding, "idle"),
+    },
+    {
+      icon: "♫",
+      label: "MUSIC",
+      state: providerIdleState(data.providerStates.spotify, "paused"),
+    },
+    {
+      icon: "▣",
+      label: "WATCHING",
+      state: watchingStatus,
+    },
+  ];
+
+  return (
+    <div className="live-standby" aria-live="polite">
+      <div className="live-standby-content">
+        <div className="live-standby-heading">
+          <p className="live-standby-label">
+            <span aria-hidden="true" className="live-standby-indicator" />
+            STANDBY
+          </p>
+          <h3>Nenhuma atividade detectada agora.</h3>
+          <p>Provavelmente vivendo offline por alguns minutos.</p>
+        </div>
+        <div className="live-standby-statuses">
+          {statuses.map((item) => (
+            <div className="live-standby-status" key={item.label}>
+              <span aria-hidden="true" className="live-standby-icon">
+                {item.icon}
+              </span>
+              <span className="live-standby-service">
+                <span>{item.label}</span>
+                <span className="live-standby-state">
+                  <i aria-hidden="true" /> {item.state}
+                </span>
+              </span>
+              <span aria-hidden="true" className="live-standby-more">
+                ···
+              </span>
+            </div>
+          ))}
+        </div>
+        <p className="live-standby-signal">
+          <span aria-hidden="true">▥</span>
+          último sinal · {signalLabel}
+        </p>
+      </div>
+      <span aria-hidden="true" className="live-standby-pattern" />
+    </div>
+  );
+}
+
 export function LiveActivitySection() {
   const section = useRef<HTMLElement>(null);
   const [data, setData] = useState<LiveActivityResponse | null>(null);
@@ -283,7 +386,9 @@ export function LiveActivitySection() {
             );
           })}
         </div>
-      ) : data || error || !endpoint ? (
+      ) : data ? (
+        <StandbyPanel data={data} now={clock} />
+      ) : error || !endpoint ? (
         <p className="live-fallback">
           Devo estar dormindo, no ônibus/dirigindo ou apenas o servidor saiu 💀
         </p>
