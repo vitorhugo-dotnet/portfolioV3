@@ -1,6 +1,7 @@
 import type { LiveActivityResponse } from "../../../lib/live-activity.ts";
 import {
   fetchProviderJson,
+  ProviderHttpError,
   record,
   safeText,
   timestamp,
@@ -121,7 +122,17 @@ export async function getSimkl(
       result,
     });
     return result;
-  } catch {
+  } catch (error) {
+    console.error("provider_error", {
+      provider: "simkl",
+      status: error instanceof ProviderHttpError ? error.status : undefined,
+      error:
+        error instanceof ProviderHttpError
+          ? "Provider request failed"
+          : error instanceof Error
+            ? error.message
+            : "Unknown error",
+    });
     return { state: "unavailable" };
   }
 }

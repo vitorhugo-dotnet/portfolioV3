@@ -12,6 +12,10 @@
   "env": {
     "production": {
       "name": "portfolio-activity-production",
+      "observability": {
+        "enabled": true,
+        "head_sampling_rate": 1
+      },
       "vars": {
         "DEVELOPMENT": "false",
         "ALLOWED_ORIGINS": "https://hugojava.dev,https://hugodotnet.dev",
@@ -20,6 +24,10 @@
     },
     "preview": {
       "name": "portfolio-activity-preview",
+      "observability": {
+        "enabled": true,
+        "head_sampling_rate": 1
+      },
       "vars": {
         "DEVELOPMENT": "false",
         "ALLOWED_ORIGINS": "https://hugojava.dev,https://hugodotnet.dev",

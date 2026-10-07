@@ -67,16 +67,21 @@ test("coding without a heartbeat does not invent current activity", async () => 
   assert.equal(result.data?.status, "idle");
   assert.equal(result.data?.observedAt, undefined);
 });
-test("WakaTime uses the API key directly for Basic authentication", async () => {
+test("WakaTime uses the API key directly and explicit summary dates", async () => {
   let authorization: string | null = null;
+  let summaryUrl: URL | undefined;
   await getCoding(
     { WAKATIME_API_KEY: "12345" },
     deps((url, init) => {
       authorization = new Headers(init?.headers).get("Authorization");
-      return url.pathname.endsWith("heartbeats") ? { data: [] } : { data: [] };
+      if (url.pathname.endsWith("summaries")) summaryUrl = url;
+      return { data: [] };
     }),
   );
   assert.equal(authorization, "Basic MTIzNDU=");
+  assert.equal(summaryUrl?.searchParams.get("start"), "2026-10-07");
+  assert.equal(summaryUrl?.searchParams.get("end"), "2026-10-07");
+  assert.equal(summaryUrl?.searchParams.has("range"), false);
 });
 const track = {
   name: "Track",

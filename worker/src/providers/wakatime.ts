@@ -1,5 +1,6 @@
 import {
   fetchProviderJson,
+  ProviderHttpError,
   finiteNumber,
   record,
   safeText,
@@ -27,7 +28,7 @@ export async function getCoding(
       ),
       fetchProviderJson(
         new URL(
-          "https://api.wakatime.com/api/v1/users/current/summaries?range=Today",
+          `https://api.wakatime.com/api/v1/users/current/summaries?start=${utcDay}&end=${utcDay}`,
         ),
         { headers },
         deps,
@@ -109,7 +110,17 @@ export async function getCoding(
           seconds === undefined ? undefined : Math.round(seconds / 60),
       },
     };
-  } catch {
+  } catch (error) {
+    console.error("provider_error", {
+      provider: "wakatime",
+      status: error instanceof ProviderHttpError ? error.status : undefined,
+      error:
+        error instanceof ProviderHttpError
+          ? "Provider request failed"
+          : error instanceof Error
+            ? error.message
+            : "Unknown error",
+    });
     return { state: "unavailable" };
   }
 }
