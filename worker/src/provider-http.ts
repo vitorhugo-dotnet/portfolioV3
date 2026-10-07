@@ -1,4 +1,11 @@
 import type { ProviderDependencies } from "./types.ts";
+export class ProviderHttpError extends Error {
+  status: number;
+  constructor(status: number) {
+    super("Provider request failed");
+    this.status = status;
+  }
+}
 export function record(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value))
     throw new Error("Invalid provider payload");
@@ -7,6 +14,7 @@ export function record(value: unknown): Record<string, unknown> {
 export function safeText(value: unknown): string | undefined {
   return typeof value === "string"
     ? value
+        // biome-ignore lint/suspicious/noControlCharactersInRegex: remove unsafe control characters from provider text.
         .replace(/[\u0000-\u001f\u007f]/g, "")
         .trim()
         .slice(0, 200) || undefined
@@ -42,7 +50,7 @@ export async function fetchProviderJson(
       signal: controller.signal,
       redirect: "error",
     });
-    if (!response.ok) throw new Error(`Provider HTTP ${response.status}`);
+    if (!response.ok) throw new ProviderHttpError(response.status);
     if (response.status === 204) return null;
     return await response.json();
   } finally {
