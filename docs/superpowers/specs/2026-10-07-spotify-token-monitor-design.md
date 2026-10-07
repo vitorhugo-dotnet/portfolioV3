@@ -23,7 +23,7 @@ For each configured provider, send a provider-specific invalid-credential alert 
 
 Use one Cloudflare KV namespace binding named `ACTIVITY_MONITOR_STATE` in production. Store only provider names, alert-state identifiers, and the Spotify authorization timestamp. Deduplicate invalid-credential alerts per provider until a later successful probe clears that provider's invalid state. Keep Spotify age alerts deduplicated for the current `SPOTIFY_AUTHORIZED_AT`; a changed timestamp starts a new age-monitoring cycle. Alert state is persisted only after Discord accepts the webhook request, allowing retry after delivery failures.
 
-The production Worker gets the daily cron trigger and monitor enablement. Preview does not run the monitor. If required monitor configuration is absent, the scheduled handler exits without a request to Spotify or Discord. If the Discord webhook fails, do not persist that alert as delivered. If KV is unavailable, log a sanitized error and do not include any secret values.
+The production Worker gets the daily cron trigger and monitor enablement. Preview does not run the monitor. If monitor enablement, Discord webhook, or KV binding is absent, the scheduled handler exits without provider requests. If `SPOTIFY_AUTHORIZED_AT` is absent or invalid, the Worker still validates provider credentials but skips only Spotify age alerts. If the Discord webhook fails, do not persist that alert as delivered. If KV is unavailable, log a sanitized error and do not include any secret values.
 
 ## Configuration
 

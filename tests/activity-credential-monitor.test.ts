@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { test } from "node:test";
+import { mock, test } from "node:test";
+import { runCredentialMonitor } from "../worker/src/credential-monitor.ts";
 import { probeActivityCredentials } from "../worker/src/credential-probes.ts";
 import type { Env, ProviderDependencies } from "../worker/src/types.ts";
 
@@ -28,6 +29,27 @@ const credentials: Env = {
   SIMKL_ACCESS_TOKEN: "simkl-secret",
   STEAM_API_KEY: "steam-secret",
   STEAM_ID: "76561198000000000",
+};
+
+function memoryState(initial: Record<string, string> = {}) {
+  const values = new Map(Object.entries(initial));
+  return {
+    values,
+    state: {
+      get: async (key: string) => values.get(key) ?? null,
+      put: async (key: string, value: string) => {
+        values.set(key, value);
+      },
+      delete: async (key: string) => {
+        values.delete(key);
+      },
+    },
+  };
+}
+
+const monitorConfig = {
+  ACTIVITY_MONITOR_ENABLED: "true",
+  DISCORD_WEBHOOK_URL: "https://discord.com/api/webhooks/123456/token-secret",
 };
 
 test("credential probes authenticate to each official provider using minimal endpoints", async () => {
@@ -183,4 +205,320 @@ test("missing credentials skip only their provider and do not make calls", async
     steam: { state: "unconfigured" },
   });
   assert.equal(requests, 1);
+});
+
+test("invalid credential alerts are deduplicated until a later valid probe", async () => {
+  let invalid = true;
+  const messages: string[] = [];
+  const { state, values } = memoryState();
+  const env = {
+    ...monitorConfig,
+    WAKATIME_API_KEY: "waka-secret",
+    ACTIVITY_MONITOR_STATE: state,
+  } as Env;
+  const deps = dependencies((url, init) => {
+    if (url.hostname === "discord.com") {
+      messages.push(String(JSON.parse(String(init?.body)).content));
+      return new Response(null, { status: 204 });
+    }
+    return invalid
+      ? new Response("private provider error", { status: 401 })
+      : { data: { id: "valid-user" } };
+  });
+  await runCredentialMonitor(env, deps);
+  await runCredentialMonitor(env, deps);
+  assert.equal(messages.length, 1);
+  assert.match(messages[0] ?? "", /WakaTime/);
+  assert.ok(!messages.join(" ").includes("private provider error"));
+  assert.ok(!JSON.stringify([...values]).includes("waka-secret"));
+  invalid = false;
+  await runCredentialMonitor(env, deps);
+  assert.equal(values.has("activity-monitor:credential:coding"), false);
+  invalid = true;
+  await runCredentialMonitor(env, deps);
+  assert.equal(messages.length, 2);
+});
+
+test("invalid credential alerts remain separate for each configured provider", async () => {
+  const messages: string[] = [];
+  const { state } = memoryState();
+  await runCredentialMonitor(
+    {
+      ...monitorConfig,
+      WAKATIME_API_KEY: "waka",
+      SIMKL_CLIENT_ID: "client",
+      SIMKL_ACCESS_TOKEN: "token",
+      STEAM_API_KEY: "steam",
+      STEAM_ID: "76561198000000000",
+      ACTIVITY_MONITOR_STATE: state,
+    } as Env,
+    dependencies((url, init) => {
+      if (url.hostname === "discord.com") {
+        messages.push(String(JSON.parse(String(init?.body)).content));
+        return new Response(null, { status: 204 });
+      }
+      return new Response("invalid credentials", { status: 403 });
+    }),
+  );
+  assert.equal(messages.length, 3);
+  assert.ok(messages.some((message) => message.includes("WakaTime")));
+  assert.ok(messages.some((message) => message.includes("Simkl")));
+  assert.ok(messages.some((message) => message.includes("Steam")));
+});
+
+test("Spotify invalid_grant sends an immediate reauthorization alert once", async () => {
+  const messages: string[] = [];
+  const { state } = memoryState();
+  const env = {
+    ...monitorConfig,
+    ...credentials,
+    ACTIVITY_MONITOR_STATE: state,
+  } as Env;
+  const deps = dependencies((url, init) => {
+    if (url.hostname === "discord.com") {
+      messages.push(String(JSON.parse(String(init?.body)).content));
+      return new Response(null, { status: 204 });
+    }
+    if (url.hostname === "accounts.spotify.com")
+      return Response.json({ error: "invalid_grant" }, { status: 400 });
+    return { data: { id: "valid" } };
+  });
+  await runCredentialMonitor(env, deps);
+  await runCredentialMonitor(env, deps);
+  assert.equal(messages.length, 1);
+  assert.match(messages[0] ?? "", /Spotify/);
+  assert.match(messages[0] ?? "", /reautoriz/i);
+  assert.ok(!messages.join(" ").includes("spotify-refresh"));
+});
+
+test("Spotify age alerts use exact messages and deduplicate per timestamp and stage", async () => {
+  const messages: string[] = [];
+  const { state } = memoryState();
+  const env = {
+    ...monitorConfig,
+    SPOTIFY_CLIENT_ID: "age-check",
+    SPOTIFY_CLIENT_SECRET: "secret",
+    SPOTIFY_REFRESH_TOKEN: "refresh",
+    SPOTIFY_AUTHORIZED_AT: new Date(now - 173 * 86400000).toISOString(),
+    ACTIVITY_MONITOR_STATE: state,
+  } as Env;
+  const deps = dependencies((url, init) => {
+    if (url.hostname === "discord.com") {
+      messages.push(String(JSON.parse(String(init?.body)).content));
+      return new Response(null, { status: 204 });
+    }
+    return { access_token: "access", expires_in: 3600 };
+  });
+  await runCredentialMonitor(env, deps);
+  await runCredentialMonitor(env, deps);
+  assert.equal(messages.length, 1);
+  assert.equal(messages[0], "⚠️ Spotify token expira em aproximadamente 7 dias");
+  env.SPOTIFY_AUTHORIZED_AT = new Date(now - 180 * 86400000).toISOString();
+  await runCredentialMonitor(env, deps);
+  await runCredentialMonitor(env, deps);
+  assert.equal(messages.length, 2);
+  assert.equal(messages[1], "🚨 Spotify token deve estar expirado");
+});
+
+test("transient Spotify errors never produce a false expiration notice", async () => {
+  const messages: string[] = [];
+  const { state } = memoryState();
+  await runCredentialMonitor(
+    {
+      ...monitorConfig,
+      SPOTIFY_CLIENT_ID: "transient",
+      SPOTIFY_CLIENT_SECRET: "secret",
+      SPOTIFY_REFRESH_TOKEN: "refresh",
+      SPOTIFY_AUTHORIZED_AT: new Date(now - 200 * 86400000).toISOString(),
+      ACTIVITY_MONITOR_STATE: state,
+    } as Env,
+    dependencies((url, init) => {
+      if (url.hostname === "discord.com") {
+        messages.push(String(JSON.parse(String(init?.body)).content));
+        return new Response(null, { status: 204 });
+      }
+      return new Response("temporary", { status: 503 });
+    }),
+  );
+  assert.deepEqual(messages, []);
+});
+
+test("missing Spotify authorization date keeps credential checks enabled without age alerts", async () => {
+  let spotifyChecks = 0;
+  let discordCalls = 0;
+  const { state } = memoryState();
+  await runCredentialMonitor(
+    {
+      ...monitorConfig,
+      SPOTIFY_CLIENT_ID: "no-date",
+      SPOTIFY_CLIENT_SECRET: "secret",
+      SPOTIFY_REFRESH_TOKEN: "refresh",
+      ACTIVITY_MONITOR_STATE: state,
+    } as Env,
+    dependencies((url) => {
+      if (url.hostname === "discord.com") discordCalls++;
+      if (url.hostname === "accounts.spotify.com") {
+        spotifyChecks++;
+        return { access_token: "access", expires_in: 3600 };
+      }
+      return { data: { id: "valid" } };
+    }),
+  );
+  assert.equal(spotifyChecks, 1);
+  assert.equal(discordCalls, 0);
+});
+
+test("disabled or incomplete monitor configuration makes no network requests", async () => {
+  let requests = 0;
+  const deps = dependencies(() => {
+    requests++;
+    return { ok: true };
+  });
+  const { state } = memoryState();
+  await runCredentialMonitor(
+    { ...credentials, ACTIVITY_MONITOR_STATE: state },
+    deps,
+  );
+  await runCredentialMonitor(
+    {
+      ...credentials,
+      ACTIVITY_MONITOR_ENABLED: "true",
+      ACTIVITY_MONITOR_STATE: state,
+    },
+    deps,
+  );
+  await runCredentialMonitor({ ...credentials, ...monitorConfig }, deps);
+  assert.equal(requests, 0);
+});
+
+test("failed Discord delivery does not mark an alert sent and retries later", async () => {
+  let deliveryFails = true;
+  let discordCalls = 0;
+  const { state, values } = memoryState();
+  const errorMock = mock.method(console, "error", () => {});
+  try {
+    await runCredentialMonitor(
+      {
+        ...monitorConfig,
+        SIMKL_CLIENT_ID: "client",
+        SIMKL_ACCESS_TOKEN: "token",
+        ACTIVITY_MONITOR_STATE: state,
+      } as Env,
+      dependencies((url) => {
+        if (url.hostname === "discord.com") {
+          discordCalls++;
+          return new Response(null, { status: deliveryFails ? 500 : 204 });
+        }
+        return new Response("unauthorized", { status: 401 });
+      }),
+    );
+  } finally {
+    errorMock.mock.restore();
+  }
+  assert.equal(values.size, 0);
+  deliveryFails = false;
+  await runCredentialMonitor(
+    {
+      ...monitorConfig,
+      SIMKL_CLIENT_ID: "client",
+      SIMKL_ACCESS_TOKEN: "token",
+      ACTIVITY_MONITOR_STATE: state,
+    } as Env,
+    dependencies((url) => {
+      if (url.hostname === "discord.com") {
+        discordCalls++;
+        return new Response(null, { status: 204 });
+      }
+      return new Response("unauthorized", { status: 401 });
+    }),
+  );
+  assert.equal(discordCalls, 2);
+  assert.equal(values.get("activity-monitor:credential:simkl"), "invalid");
+});
+
+test("KV errors never leak secrets or falsely record alert delivery", async () => {
+  let discordCalls = 0;
+  const state = {
+    get: async () => {
+      throw Error("private KV detail");
+    },
+    put: async () => {
+      throw Error("private KV detail");
+    },
+    delete: async () => {
+      throw Error("private KV detail");
+    },
+  };
+  const errorMock = mock.method(console, "error", () => {});
+  try {
+    await runCredentialMonitor(
+      {
+        ...monitorConfig,
+        SIMKL_CLIENT_ID: "client",
+        SIMKL_ACCESS_TOKEN: "simkl-secret",
+        ACTIVITY_MONITOR_STATE: state,
+      } as Env,
+      dependencies((url) => {
+        if (url.hostname === "discord.com") discordCalls++;
+        return new Response("private provider error", { status: 403 });
+      }),
+    );
+  } finally {
+    errorMock.mock.restore();
+  }
+  assert.equal(discordCalls, 0);
+  assert.ok(!JSON.stringify(state).includes("simkl-secret"));
+});
+
+test("KV write and delete errors stay isolated from the monitor", async () => {
+  const messages: string[] = [];
+  const errorMock = mock.method(console, "error", () => {});
+  try {
+    const writeFailure = {
+      get: async () => null,
+      put: async () => {
+        throw Error("write detail");
+      },
+      delete: async () => {},
+    };
+    await runCredentialMonitor(
+      {
+        ...monitorConfig,
+        SIMKL_CLIENT_ID: "client",
+        SIMKL_ACCESS_TOKEN: "token",
+        ACTIVITY_MONITOR_STATE: writeFailure,
+      } as Env,
+      dependencies((url, init) => {
+        if (url.hostname === "discord.com") {
+          messages.push(String(JSON.parse(String(init?.body)).content));
+          return new Response(null, { status: 204 });
+        }
+        return new Response("private error", { status: 403 });
+      }),
+    );
+    const deleteFailure = {
+      get: async () => "invalid",
+      put: async () => {},
+      delete: async () => {
+        throw Error("delete detail");
+      },
+    };
+    await runCredentialMonitor(
+      {
+        ...monitorConfig,
+        SIMKL_CLIENT_ID: "client",
+        SIMKL_ACCESS_TOKEN: "token",
+        ACTIVITY_MONITOR_STATE: deleteFailure,
+      } as Env,
+      dependencies((url) =>
+        url.hostname === "discord.com"
+          ? new Response(null, { status: 204 })
+          : { activities: {} },
+      ),
+    );
+  } finally {
+    errorMock.mock.restore();
+  }
+  assert.equal(messages.length, 1);
+  assert.ok(!messages.join(" ").includes("private error"));
 });

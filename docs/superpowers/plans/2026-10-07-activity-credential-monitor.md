@@ -71,20 +71,20 @@
 
 **Files:** `worker/src/credential-monitor.ts` (create); `worker/src/types.ts`; `tests/activity-credential-monitor.test.ts`.
 
-**Interfaces:** `runCredentialMonitor(env: Env, deps: ProviderDependencies & { state?: MonitorStateStore }): Promise<void>`. `MonitorStateStore` exposes `get(key: string): Promise<string | null>`, `put(key: string, value: string): Promise<void>`, and `delete(key: string): Promise<void>`. `runCredentialMonitor` skips all provider/network work if monitoring is disabled, Discord webhook is absent, or the state binding is absent; if enabled, it probes configured providers, posts sanitized provider-specific invalid-credential alerts, posts Spotify age-stage notices only when the Spotify refresh succeeded, and updates KV only after successful webhook delivery.
+**Interfaces:** `runCredentialMonitor(env: Env, deps: ProviderDependencies): Promise<void>`. `MonitorStateStore` exposes `get(key: string): Promise<string | null>`, `put(key: string, value: string): Promise<void>`, and `delete(key: string): Promise<void>`; `Env.ACTIVITY_MONITOR_STATE` uses this interface. `runCredentialMonitor` skips all provider/network work if monitoring is disabled, Discord webhook is absent, or the state binding is absent; if enabled, it probes configured providers, posts sanitized provider-specific invalid-credential alerts, posts Spotify age-stage notices only when the Spotify refresh succeeded, and updates KV only after successful webhook delivery.
 
-- [ ] Write tests for first invalid alert, duplicate suppression, invalid-to-valid recovery clearing, transient retaining existing state without a false alert, separate alerts per provider, and Spotify `invalid_grant` alerting.
-- [ ] Write tests for age warning and expiration notifications, one notification per authorization timestamp/stage, missing/invalid timestamp, monitor disabled/missing webhook, Discord non-2xx/network failure, and KV read/write/delete failures.
-- [ ] Run `node --experimental-strip-types --test tests/activity-credential-monitor.test.ts`; confirm the new tests fail.
-- [ ] Implement deterministic KV keys based on provider and Spotify authorization timestamp/stage; do not include secret-derived values. POST short plain-text messages to Discord with `wait=true`, timeout, and no logging of the webhook URL or response body.
-- [ ] Ensure transient Spotify probe results suppress date-based expiration claims; only a successful refresh qualifies for age-stage notification.
-- [ ] Rerun focused tests and `npm run typecheck:worker`; confirm delivery failures leave alerts eligible for retry. Commit: `feat: alert on invalid activity credentials`.
+- [x] Write tests for first invalid alert, duplicate suppression, invalid-to-valid recovery clearing, transient retaining existing state without a false alert, separate alerts per provider, and Spotify `invalid_grant` alerting.
+- [x] Write tests for age warning and expiration notifications, one notification per authorization timestamp/stage, missing/invalid timestamp, monitor disabled/missing webhook, Discord non-2xx/network failure, and KV read/write/delete failures.
+- [x] Run `node --experimental-strip-types --test tests/activity-credential-monitor.test.ts`; confirm the new tests fail.
+- [x] Implement deterministic KV keys based on provider and Spotify authorization timestamp/stage; do not include secret-derived values. POST short plain-text messages to Discord with `wait=true`, timeout, and no logging of the webhook URL or response body.
+- [x] Ensure transient Spotify probe results suppress date-based expiration claims; only a successful refresh qualifies for age-stage notification.
+- [x] Rerun focused tests and `npm run typecheck:worker`; confirm delivery failures leave alerts eligible for retry. Commit: `feat: alert on invalid activity credentials`.
 
 ### Task 4: Scheduled Worker configuration and operational instructions
 
 **Files:** `worker/src/index.ts`; `worker/src/types.ts`; `worker/wrangler.jsonc`; `tests/live-activity-worker.test.ts`; `README.md`.
 
-**Interfaces:** The Worker default export retains `fetch(request, env, ctx)` and adds `scheduled(controller, env, ctx)`. Scheduled execution injects `globalThis.fetch`, `Date.now`, and the `ACTIVITY_MONITOR_STATE` KV binding into `runCredentialMonitor`. Production cron is `0 6 * * *`; preview has no cron and has `ACTIVITY_MONITOR_ENABLED` false.
+**Interfaces:** The Worker default export retains `fetch(request, env, ctx)` and adds `scheduled(controller, env, ctx)`. Scheduled execution injects `globalThis.fetch` and `Date.now` into `runCredentialMonitor`; the KV binding is on `env.ACTIVITY_MONITOR_STATE`. Production cron is `0 6 * * *`; preview has no cron and has `ACTIVITY_MONITOR_ENABLED` false.
 
 - [ ] Add a scheduled-entrypoint test that invokes a fake controller and confirms the injected time, KV binding, and monitor function are used; retain existing fetch route/CORS/cache tests unchanged.
 - [ ] Run `node --experimental-strip-types --test tests/live-activity-worker.test.ts`; confirm the new scheduled test fails.

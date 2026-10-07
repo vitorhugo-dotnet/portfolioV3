@@ -16,6 +16,15 @@ export interface Env {
   PAGES_PROJECT?: string;
   EXPOSE_CODING_PROJECT?: string;
   DEVELOPMENT?: string;
+  ACTIVITY_MONITOR_ENABLED?: string;
+  DISCORD_WEBHOOK_URL?: string;
+  SPOTIFY_AUTHORIZED_AT?: string;
+  ACTIVITY_MONITOR_STATE?: MonitorStateStore;
+}
+export interface MonitorStateStore {
+  get(key: string): Promise<string | null>;
+  put(key: string, value: string): Promise<void>;
+  delete(key: string): Promise<void>;
 }
 export interface ProviderDependencies {
   fetch: typeof fetch;
