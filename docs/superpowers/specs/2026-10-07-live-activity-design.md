@@ -2,7 +2,7 @@
 
 ## Objetivo e contexto
 
-Implementar a issue #1 do portfolioV3 e a extensão solicitada para CI: preview automático de PRs e disparo manual com escolha entre produção e preview. Preservar Next.js com `output: "export"`, TypeScript, identidade visual japonesa e animações existentes. O desenho inicial foi aprovado em 07/10/2026.
+Implementar a issue #1 do portfolioV3, incluindo a integração Steam solicitada no comentário https://github.com/vitorhugo-dotnet/portfolioV3/issues/1#issuecomment-6039440926, e a extensão solicitada para CI: preview automático de PRs e disparo manual com escolha entre produção e preview. Preservar Next.js com `output: "export"`, TypeScript, identidade visual japonesa e animações existentes. O desenho inicial foi aprovado em 07/10/2026.
 
 Hoje o frontend consulta eventos públicos do GitHub e a CI valida, testa e exporta o site. O workflow `.github/workflows/cloudflare-pages.yml` publica somente a branch main. A nova seção complementa a atividade do GitHub.
 
@@ -14,13 +14,15 @@ O browser consulta somente `GET /api/activity` do Worker. A URL pública é conf
 
 ## Contrato e provedores
 
-O DTO conserva os campos de coding, spotify e simkl sugeridos na issue, com `generatedAt`, timestamp da observação quando disponível e estado por provedor: disponível, vazio, indisponível ou não configurado. Ausência de credenciais não causa falha global. Não anunciar atividade como atual usando apenas o horário da consulta.
+O DTO conserva os campos de coding, spotify, simkl e steam sugeridos na issue, com `generatedAt`, timestamp da observação quando disponível e estado por provedor: disponível, vazio, indisponível ou não configurado. Ausência de credenciais não causa falha global. Não anunciar atividade como atual usando apenas o horário da consulta.
 
 WakaTime consulta atividade recente e resumo do dia; coding ativo depende de um heartbeat recente, com janela de cinco minutos. Informações ausentes permanecem ausentes. Não expor caminhos de arquivos, branches, identificadores privados ou payloads brutos. Nome de projeto só é publicado por configuração explícita; linguagem, editor e duração são permitidos.
 
 Spotify obtém access token com client ID, client secret e refresh token armazenados em Cloudflare Secrets; reutiliza o access token em memória até perto de expirar. Consulta a faixa atual e, quando ausente, a mais recente. Uma resposta 401 permite uma renovação e uma tentativa adicional. Não persistir tokens em cache público nem devolver dados de conta.
 
 Simkl utiliza client ID e access token para atividade disponível da conta. Usar histórico recente quando o provedor não oferecer evidência de reprodução atual, sem inventar status "assistindo agora". Publicar somente tipo, título, episódio e URLs públicas.
+
+Steam usa exclusivamente a Steam Web API oficial no mesmo Worker. Consultar `ISteamUser/GetPlayerSummaries/v2/` para detectar o jogo atual por `gameextrainfo` e `gameid`. Sem jogo atual, consultar `IPlayerService/GetRecentlyPlayedGames/v1/` como fallback. Publicar `steam?: { isPlaying: boolean; game?: string; appId?: string; imageUrl?: string; externalUrl?: string }`, com app ID numérico validado e URLs públicas HTTPS. O fallback recebe o rótulo "Jogado recentemente" e `isPlaying: false`; o endpoint de jogos recentes não garante ordem cronológica, portanto não afirmar qual foi o último jogo sem timestamp confiável. Perfil ou Game Details privados, resposta vazia e indisponibilidade geram fallback apenas no card Steam. A chave fica exclusivamente em Cloudflare Secrets. Não depender de SteamDB nem fazer scraping. Não criar outro serviço, banco ou WebSocket.
 
 Cada integração possui timeout e normalização próprios; chamadas independentes executam em paralelo. Falhas, JSON inválido e rate limits afetam somente o card correspondente. Logs não contêm credenciais, headers de autenticação nem corpos privados.
 
@@ -32,11 +34,11 @@ Cachear somente o DTO normalizado no Cache API do Worker por 60 segundos, com ch
 
 CORS permite os dois domínios existentes e o domínio Pages do projeto, incluindo seus previews, validando hostname com limites de sufixo. localhost é permitido apenas em desenvolvimento. Não usar cookies ou credentials no fetch. CORS não torna o endpoint privado: todo campo retornado deve ser seguro para acesso público.
 
-Secrets do Worker: `WAKATIME_API_KEY`, `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `SPOTIFY_REFRESH_TOKEN`, `SIMKL_CLIENT_ID`, `SIMKL_ACCESS_TOKEN`. Configuração não secreta inclui origens autorizadas e opção de exposição do nome de projeto. Secrets são provisionados separadamente nos dois ambientes usando Wrangler; CI não os injeta em assets do site.
+Secrets do Worker: `WAKATIME_API_KEY`, `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `SPOTIFY_REFRESH_TOKEN`, `SIMKL_CLIENT_ID`, `SIMKL_ACCESS_TOKEN`, `STEAM_API_KEY`. Configurar `STEAM_ID` como variável do Worker; não incluir dados de conta no DTO. Configuração não secreta inclui origens autorizadas e opção de exposição do nome de projeto. Secrets são provisionados separadamente nos dois ambientes usando Wrangler; CI não os injeta em assets do site.
 
 ## Frontend
 
-Criar componente próprio com três cards integrado à seção de atividade existente, usando estilos responsivos e os componentes de reveal existentes. Respeitar movimento reduzido. Incluir skeleton, estado vazio, falha por provedor, indisponibilidade geral e endpoint não configurado. Não usar dados fictícios como atividade real.
+Criar componente próprio com quatro cards integrado à seção de atividade existente, usando estilos responsivos e os componentes de reveal existentes. Respeitar movimento reduzido. Incluir skeleton, estado vazio, falha por provedor, indisponibilidade geral e endpoint não configurado. Não usar dados fictícios como atividade real.
 
 Atualizar a cada 60 segundos somente quando a aba e a seção estiverem visíveis, usando Page Visibility e IntersectionObserver. Abortar requests ao desmontar, impedir sobreposição e retomar ao voltar à seção. Mostrar horário da atualização e distinguir atividade atual de recente; marcar dados antigos após dois minutos sem atualização bem-sucedida.
 
@@ -54,7 +56,7 @@ Credenciais de deploy existentes permanecem no GitHub Secrets. Validar configura
 
 ## Validação e entrega
 
-Testar integrações com fetch simulado: normalização, dados vazios, erros, timeout, renovação Spotify e falhas independentes. Testar roteamento, CORS, cache e ausência dos valores de secrets no DTO. Testar política de ambiente para PR, manual preview em main, manual production, push e schedule; forks não devem acessar deploy.
+Testar integrações com fetch simulado: normalização, dados vazios, erros, timeout, renovação Spotify e falhas independentes. Para Steam, testar jogo atual, fallback recente sem indicação falsa de último jogo, perfil/Game Details privados, dados vazios, credenciais ausentes e erros; verificar que a chave e o Steam ID não aparecem no DTO. Testar roteamento, CORS, cache e ausência dos valores de secrets no DTO. Testar política de ambiente para PR, manual preview em main, manual production, push e schedule; forks não devem acessar deploy.
 
 Executar lint, typecheck, testes, build/export e dry-run do Worker. Verificar ausência de secrets de teste nos assets gerados e estados responsivos/acessíveis do componente. Documentar provisionamento de secrets, URLs públicas, escolha de ambiente, limitação dos forks e Worker preview compartilhado. Testes reais de provedores e deploy cloud dependem das credenciais provisionadas; não declarar essas integrações verificadas somente com mocks.
 
