@@ -21,6 +21,19 @@ export interface ProviderDependencies {
   fetch: typeof fetch;
   now: () => number;
 }
+export type CredentialProbeState =
+  | "valid"
+  | "invalid"
+  | "transient"
+  | "unconfigured";
+export type CredentialProbeResult = {
+  state: CredentialProbeState;
+  reason?:
+    | "invalid_token"
+    | "invalid_client"
+    | "unauthorized"
+    | "provider_error";
+};
 export interface ProviderResult<K extends Provider> {
   state: ProviderState;
   data?: LiveActivityResponse[K];

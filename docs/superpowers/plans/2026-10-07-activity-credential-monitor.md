@@ -60,12 +60,12 @@
 
 **Interfaces:** `probeActivityCredentials(env: Env, deps: ProviderDependencies): Promise<Record<"coding" | "spotify" | "simkl" | "steam", CredentialProbeResult>>`, where `CredentialProbeResult` is `{ state: "valid" | "invalid" | "transient" | "unconfigured"; reason?: "invalid_token" | "invalid_client" | "unauthorized" | "provider_error" }`. Never include response bodies, credentials, or URLs in results.
 
-- [ ] Write fake-fetch tests for WakaTime `/api/v1/users/current`, Spotify refresh exchange, Simkl `/sync/activities`, and Steam `ISteamUser/GetPlayerSummaries`; verify correct auth headers/query fields without returning secrets in results.
-- [ ] Test 401/403 invalid classification for WakaTime, Simkl, and Steam; Spotify `invalid_grant`, `invalid_client`, and 401 invalid classification; classify 429, 5xx, timeout, invalid JSON, and unexpected 4xx as transient.
-- [ ] Test each missing/incomplete provider configuration returns `unconfigured` for that provider while still probing the remaining configured providers.
-- [ ] Run `node --experimental-strip-types --test tests/activity-credential-monitor.test.ts`; confirm the new tests fail.
-- [ ] Implement provider-specific probes with five-second aborts and official HTTPS endpoints; query no playback/history data beyond the minimum authenticated validity probe.
-- [ ] Rerun focused tests and `npm run typecheck:worker`; confirm no secrets occur in serialized probe results. Commit: `feat: check credentials for all activity providers`.
+- [x] Write fake-fetch tests for WakaTime `/api/v1/users/current`, Spotify refresh exchange, Simkl `/sync/activities`, and Steam `ISteamUser/GetPlayerSummaries`; verify correct auth headers/query fields without returning secrets in results.
+- [x] Test 401/403 invalid classification for WakaTime, Simkl, and Steam; Spotify `invalid_grant`, `invalid_client`, and 401 invalid classification; classify 429, 5xx, timeout, invalid JSON, and unexpected 4xx as transient.
+- [x] Test each missing/incomplete provider configuration returns `unconfigured` for that provider while still probing the remaining configured providers.
+- [x] Run `node --experimental-strip-types --test tests/activity-credential-monitor.test.ts`; confirm the new tests fail.
+- [x] Implement provider-specific probes with five-second aborts and official HTTPS endpoints; query no playback/history data beyond the minimum authenticated validity probe.
+- [x] Rerun focused tests and `npm run typecheck:worker`; confirm no secrets occur in serialized probe results. Commit: `feat: check credentials for all activity providers`.
 
 ### Task 3: Daily monitor, Discord delivery, and KV deduplication
 
