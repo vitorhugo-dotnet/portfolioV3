@@ -48,7 +48,7 @@ export async function fetchProviderJson(
     const response = await deps.fetch(url, {
       ...init,
       signal: controller.signal,
-      redirect: "error",
+      redirect: "manual",
     });
     if (!response.ok) throw new ProviderHttpError(response.status);
     if (response.status === 204) return null;
