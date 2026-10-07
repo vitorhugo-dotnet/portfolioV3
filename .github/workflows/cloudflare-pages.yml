@@ -63,7 +63,7 @@ jobs:
     needs: [quality, test, target]
     runs-on: ubuntu-latest
     env:
-      NEXT_PUBLIC_ACTIVITY_API_URL: ${{ vars[needs.target.outputs.environment == 'production' && 'ACTIVITY_API_URL_PRODUCTION' || 'ACTIVITY_API_URL_PREVIEW'] }}
+      NEXT_PUBLIC_ACTIVITY_API_URL: ${{ vars[needs.target.outputs.environment == 'production' && 'ACTIVITY_API_URL_PRODUCTION' || 'ACTIVITY_API_URL_PREVIEW'] || (needs.target.outputs.environment == 'production' && 'https://portfolio-activity-production.hugoalves-java.workers.dev/api/activity' || 'https://portfolio-activity-preview.hugoalves-java.workers.dev/api/activity') }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -116,7 +116,7 @@ jobs:
         env:
           DEPLOY_ENVIRONMENT: ${{ needs.target.outputs.environment }}
           PAGES_BRANCH: ${{ needs.target.outputs.pages_branch }}
-          ACTIVITY_API_URL: ${{ vars[needs.target.outputs.environment == 'production' && 'ACTIVITY_API_URL_PRODUCTION' || 'ACTIVITY_API_URL_PREVIEW'] }}
+          ACTIVITY_API_URL: ${{ vars[needs.target.outputs.environment == 'production' && 'ACTIVITY_API_URL_PRODUCTION' || 'ACTIVITY_API_URL_PREVIEW'] || (needs.target.outputs.environment == 'production' && 'https://portfolio-activity-production.hugoalves-java.workers.dev/api/activity' || 'https://portfolio-activity-preview.hugoalves-java.workers.dev/api/activity') }}
           CLOUDFLARE_PAGES_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
