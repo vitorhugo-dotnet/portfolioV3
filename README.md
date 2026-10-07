@@ -2,7 +2,7 @@
 
 Vitor Hugo's portfolio uses Next.js App Router, React, TypeScript and static export. The Japanese landscape, product cards, Android mockup, laboratory filters, repository search and GitHub activity keep the original visual identity.
 
-## Local development 
+## Local development
 
 Use Node.js 24 (see `.nvmrc`) and npm with the committed `package-lock.json`.
 
