@@ -13,7 +13,9 @@
     "ci": "biome ci .",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
     "sync:repos": "node --experimental-strip-types scripts/sync-repositories.ts",
-    "typecheck:worker": "tsc --noEmit -p worker/tsconfig.json"
+    "typecheck:worker": "tsc --noEmit -p worker/tsconfig.json",
+    "worker:dev": "wrangler dev --config worker/wrangler.jsonc",
+    "worker:check": "wrangler deploy --config worker/wrangler.jsonc --env preview --dry-run && wrangler deploy --config worker/wrangler.jsonc --env production --dry-run"
   },
   "dependencies": {
     "motion": "^14.0.0",

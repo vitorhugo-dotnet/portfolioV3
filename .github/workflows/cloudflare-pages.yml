@@ -6,17 +6,34 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      environment:
+        description: Cloudflare deployment environment
+        required: true
+        type: choice
+        default: preview
+        options: [preview, production]
   schedule:
     - cron: '0 6 * * *'
 
 permissions:
   contents: read
 
-concurrency:
-  group: pages-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
+  target:
+    runs-on: ubuntu-latest
+    outputs:
+      deploy: ${{ steps.target.outputs.deploy }}
+      environment: ${{ steps.target.outputs.environment }}
+      pages_branch: ${{ steps.target.outputs.pages_branch }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      - id: target
+        run: node --experimental-strip-types scripts/deployment-target.ts
+
   quality:
     runs-on: ubuntu-latest
     steps:
@@ -28,6 +45,8 @@ jobs:
       - run: npm ci
       - run: npm run ci
       - run: npm run typecheck
+      - run: npm run typecheck:worker
+      - run: npm run worker:check
 
   test:
     runs-on: ubuntu-latest
@@ -41,8 +60,10 @@ jobs:
       - run: npm test
 
   build:
-    needs: [quality, test]
+    needs: [quality, test, target]
     runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_ACTIVITY_API_URL: ${{ vars[needs.target.outputs.environment == 'production' && 'ACTIVITY_API_URL_PRODUCTION' || 'ACTIVITY_API_URL_PREVIEW'] }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -71,31 +92,32 @@ jobs:
           retention-days: 7
 
   deploy:
-    needs: build
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: [build, target]
+    if: needs.target.outputs.deploy == 'true'
     runs-on: ubuntu-latest
-    env:
-      CLOUDFLARE_PAGES_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
+    # The Worker and its matching Pages artifact publish under one shared lock.
+    # Do not cancel an active deployment when another commit arrives.
+    concurrency:
+      group: portfolio-cloudflare-${{ needs.target.outputs.environment }}
+      cancel-in-progress: false
     steps:
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
-          node-version: '24'
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
       - uses: actions/download-artifact@v8
         with:
           name: portfolio-static-${{ github.sha }}
           path: out/
-      - name: Validate project configuration
-        run: |
-          if [[ ! "$CLOUDFLARE_PAGES_PROJECT" =~ ^[a-z0-9][a-z0-9-]{0,57}[a-z0-9]$ ]]; then
-            echo 'Set CLOUDFLARE_PAGES_PROJECT to the existing Cloudflare Pages project name (2–59 characters).'
-            exit 1
-          fi
-          test -s out/index.html
-      - name: Deploy the build artifact
-        uses: cloudflare/wrangler-action@v4
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          packageManager: npm
-          # Action arguments do not expand shell environment variables.
-          command: pages deploy out --project-name=${{ vars.CLOUDFLARE_PAGES_PROJECT }} --branch=main --commit-hash=${{ github.sha }} --commit-dirty=false
+      - name: Deploy Worker and Pages
+        run: node --experimental-strip-types scripts/deploy-cloudflare.ts
+        env:
+          DEPLOY_ENVIRONMENT: ${{ needs.target.outputs.environment }}
+          PAGES_BRANCH: ${{ needs.target.outputs.pages_branch }}
+          ACTIVITY_API_URL: ${{ vars[needs.target.outputs.environment == 'production' && 'ACTIVITY_API_URL_PRODUCTION' || 'ACTIVITY_API_URL_PREVIEW'] }}
+          CLOUDFLARE_PAGES_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WRANGLER_SEND_METRICS: 'false'
