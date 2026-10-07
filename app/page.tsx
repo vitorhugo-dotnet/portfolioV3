@@ -2,6 +2,7 @@
 import Link from "next/link";
 import type { AnchorHTMLAttributes, ReactNode } from "react";
 import { useEffect, useState } from "react";
+import { LiveActivitySection } from "../components/live-activity";
 import {
   DepthLayer,
   HeroScene,
@@ -291,6 +292,7 @@ export default function Page() {
             ["android", "Android"],
             ["laboratorio", "Laboratório"],
             ["atividade", "Atividade"],
+            ["agora", "Agora"],
             ["sobre", "Além do código"],
           ].map(([id, label]) => (
             <a
@@ -706,8 +708,9 @@ export default function Page() {
             anual de contribuições nem atividades privadas.
           </p>
         </Chapter>
+        <LiveActivitySection />
         <section className="about" id="sobre">
-          <div className="about-number">06 / ALÉM DO CÓDIGO</div>
+          <div className="about-number">07 / ALÉM DO CÓDIGO</div>
           <Reveal className="about-title">
             <span lang="ja">探求</span>
             <h2>
@@ -733,7 +736,7 @@ export default function Page() {
         </section>
         <section className="contact" id="contato">
           <Reveal>
-            <span className="tag">07 / PRÓXIMO CAPÍTULO</span>
+            <span className="tag">08 / PRÓXIMO CAPÍTULO</span>
           </Reveal>
           <h2>
             Vamos construir
