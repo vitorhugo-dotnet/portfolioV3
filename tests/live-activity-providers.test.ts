@@ -5,6 +5,11 @@ import { getSimkl } from "../worker/src/providers/simkl.ts";
 import { getSpotify } from "../worker/src/providers/spotify.ts";
 import { getSteam } from "../worker/src/providers/steam.ts";
 import { getCoding } from "../worker/src/providers/wakatime.ts";
+import {
+  refreshSpotifyToken,
+  SpotifyTokenError,
+  spotifyAgeStage,
+} from "../worker/src/spotify-token.ts";
 import type { ProviderDependencies } from "../worker/src/types.ts";
 
 const now = Date.parse("2026-10-07T12:00:00Z");
@@ -197,6 +202,105 @@ test("Spotify retries 401 only once and degrades on the second failure", async (
   );
   assert.equal(refreshes, 2);
   assert.equal(result.state, "unavailable");
+});
+test("Spotify refresh classifies invalid credentials without exposing provider bodies", async () => {
+  const env = {
+    SPOTIFY_CLIENT_ID: "client-sentinel",
+    SPOTIFY_CLIENT_SECRET: "secret-sentinel",
+    SPOTIFY_REFRESH_TOKEN: "refresh-sentinel",
+  };
+  for (const [response, code, status] of [
+    [
+      Response.json({ error: "invalid_grant" }, { status: 400 }),
+      "invalid_grant",
+      400,
+    ],
+    [
+      Response.json({ error: "invalid_client" }, { status: 401 }),
+      "invalid_client",
+      401,
+    ],
+    [
+      Response.json({ error: "unauthorized" }, { status: 401 }),
+      "unauthorized",
+      401,
+    ],
+    [Response.json({ error: "slow_down" }, { status: 429 }), "slow_down", 429],
+  ] as const) {
+    await assert.rejects(
+      refreshSpotifyToken(
+        env,
+        deps(() => response),
+      ),
+      (error: unknown) => {
+        assert.ok(error instanceof SpotifyTokenError);
+        assert.equal(error.code, code);
+        assert.equal(error.status, status);
+        assert.ok(!error.message.includes("sentinel"));
+        return true;
+      },
+    );
+  }
+});
+test("Spotify refresh treats server, timeout and malformed success as non-auth errors", async () => {
+  const env = {
+    SPOTIFY_CLIENT_ID: "server-error",
+    SPOTIFY_CLIENT_SECRET: "secret",
+    SPOTIFY_REFRESH_TOKEN: "refresh",
+  };
+  for (const response of [
+    new Response("unavailable", { status: 503 }),
+    Response.json({ expires_in: 3600 }),
+  ]) {
+    await assert.rejects(
+      refreshSpotifyToken(
+        env,
+        deps(() => response),
+      ),
+      (error: unknown) => {
+        assert.ok(error instanceof SpotifyTokenError);
+        assert.notEqual(error.code, "invalid_grant");
+        assert.notEqual(error.code, "invalid_client");
+        return true;
+      },
+    );
+  }
+  const timeoutDeps: ProviderDependencies = {
+    now: () => now,
+    fetch: async (_input, init) => {
+      assert.ok(init?.signal);
+      throw new DOMException("Aborted", "AbortError");
+    },
+  };
+  await assert.rejects(
+    refreshSpotifyToken(env, timeoutDeps),
+    (error: unknown) => {
+      assert.ok(error instanceof SpotifyTokenError);
+      assert.equal(error.code, undefined);
+      return true;
+    },
+  );
+});
+test("Spotify authorization age uses inclusive 173 and 180 day boundaries", () => {
+  const day = 86400000;
+  const hour = 3600000;
+  for (const [age, expected] of [
+    [172 * day + 23 * hour, undefined],
+    [173 * day, "warning"],
+    [179 * day + 23 * hour, "warning"],
+    [180 * day, "expired"],
+  ] as const) {
+    assert.equal(
+      spotifyAgeStage(new Date(now - age).toISOString(), now),
+      expected,
+    );
+  }
+  assert.equal(spotifyAgeStage(undefined, now), undefined);
+  assert.equal(spotifyAgeStage("not-a-date", now), undefined);
+  assert.equal(
+    spotifyAgeStage(new Date(now + day).toISOString(), now),
+    undefined,
+  );
 });
 test("Simkl checks last activity and returns only sanitized recent history", async () => {
   const result = await getSimkl(

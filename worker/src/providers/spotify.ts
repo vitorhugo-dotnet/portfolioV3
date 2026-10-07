@@ -1,18 +1,13 @@
 import {
   fetchProviderJson,
-  finiteNumber,
   ProviderHttpError,
   record,
   safeHttpsUrl,
   safeText,
   timestamp,
 } from "../provider-http.ts";
+import { refreshSpotifyToken } from "../spotify-token.ts";
 import type { Env, ProviderDependencies, ProviderResult } from "../types.ts";
-
-const tokens = new WeakMap<
-  typeof fetch,
-  { identity: string; token: string; expiresAt: number }
->();
 export async function getSpotify(
   env: Env,
   deps: ProviderDependencies,
@@ -24,50 +19,15 @@ export async function getSpotify(
   } = env;
   if (!client || !secret || !refresh) return { state: "unconfigured" };
   try {
-    const identity = JSON.stringify([client, secret, refresh]);
-    async function accessToken(force = false): Promise<string> {
-      const cached = tokens.get(deps.fetch);
-      if (
-        !force &&
-        cached?.identity === identity &&
-        cached.expiresAt > deps.now()
-      )
-        return cached.token;
-      const payload = record(
-        await fetchProviderJson(
-          new URL("https://accounts.spotify.com/api/token"),
-          {
-            method: "POST",
-            headers: {
-              Authorization: `Basic ${btoa(`${client}:${secret}`)}`,
-              "Content-Type": "application/x-www-form-urlencoded",
-            },
-            body: new URLSearchParams({
-              grant_type: "refresh_token",
-              refresh_token: refresh as string,
-            }).toString(),
-          },
-          deps,
-        ),
-      );
-      if (
-        typeof payload.access_token !== "string" ||
-        !payload.access_token ||
-        !finiteNumber(payload.expires_in)
-      )
-        throw Error("Invalid access token");
-      tokens.set(deps.fetch, {
-        identity,
-        token: payload.access_token,
-        expiresAt: deps.now() + Number(payload.expires_in) * 1000 - 30000,
-      });
-      return payload.access_token;
-    }
     async function request(path: string): Promise<unknown> {
       try {
         return await fetchProviderJson(
           new URL(`https://api.spotify.com/v1/${path}`),
-          { headers: { Authorization: `Bearer ${await accessToken()}` } },
+          {
+            headers: {
+              Authorization: `Bearer ${await refreshSpotifyToken(env, deps)}`,
+            },
+          },
           deps,
         );
       } catch (error) {
@@ -75,7 +35,11 @@ export async function getSpotify(
           throw error;
         return fetchProviderJson(
           new URL(`https://api.spotify.com/v1/${path}`),
-          { headers: { Authorization: `Bearer ${await accessToken(true)}` } },
+          {
+            headers: {
+              Authorization: `Bearer ${await refreshSpotifyToken(env, deps, { force: true })}`,
+            },
+          },
           deps,
         );
       }
