@@ -302,42 +302,50 @@ test("Spotify authorization age uses inclusive 173 and 180 day boundaries", () =
     undefined,
   );
 });
-test("Simkl checks last activity and returns only sanitized recent history", async () => {
+test("Simkl checks activities and reads only the recent item delta", async () => {
   const result = await getSimkl(
     { SIMKL_CLIENT_ID: "client", SIMKL_ACCESS_TOKEN: "simkl-secret" },
     deps((url, init) => {
       if (url.pathname.endsWith("activities")) {
         assert.equal(init?.method, undefined);
+        assert.equal(url.searchParams.get("client_id"), "client");
         assert.equal(url.searchParams.get("app-name"), "portfolio-v3");
         assert.equal(url.searchParams.get("app-version"), "3.0.0");
         assert.equal(
           new Headers(init?.headers).get("User-Agent"),
           "portfolio-v3/3.0.0",
         );
-        return { all: "2026-10-07T11:30:00Z" };
+        return {
+          all: "2026-10-07T11:30:00Z",
+          anime: { watching: "2026-10-07T11:30:00Z" },
+        };
       }
-      assert.equal(url.pathname, "/sync/history");
+      assert.equal(url.pathname, "/sync/all-items/anime/watching");
       assert.equal(init?.method, undefined);
-      assert.ok(url.searchParams.has("date_from"));
+      assert.equal(
+        url.searchParams.get("date_from"),
+        new Date(now - 40 * 60000).toISOString(),
+      );
+      assert.equal(url.searchParams.get("client_id"), "client");
       assert.equal(url.searchParams.get("app-name"), "portfolio-v3");
       assert.equal(url.searchParams.get("app-version"), "3.0.0");
       assert.equal(
         new Headers(init?.headers).get("User-Agent"),
         "portfolio-v3/3.0.0",
       );
-      return url.searchParams.get("type") === "anime"
-        ? [
-            {
-              watched_at: "2026-10-07T11:30:00Z",
-              last_watched: "E12",
-              show: {
-                title: "Anime",
-                poster: "83/83975f751784587",
-                ids: { simkl: 40398 },
-              },
+      return {
+        anime: [
+          {
+            last_watched_at: "2026-10-07T11:30:00Z",
+            last_watched: "E12",
+            show: {
+              title: "Anime",
+              poster: "83/83975f751784587",
+              ids: { simkl: 40398 },
             },
-          ]
-        : [];
+          },
+        ],
+      };
     }),
   );
   assert.equal(result.data?.title, "Anime");
@@ -371,13 +379,14 @@ test("Simkl refreshes a rejected AUTH V2 access token once and retries the reque
     now: () => now,
     fetch: async (input, init) => {
       const url = new URL(String(input));
+      assert.equal(url.pathname, "/sync/activities");
+      assert.equal(url.searchParams.get("client_id"), "client");
       if (url.pathname.endsWith("activities") && rejectedRequestCount++ === 0)
         return Response.json({ error: "invalid_token" }, { status: 401 });
       assert.equal(
         new Headers(init?.headers).get("Authorization"),
         "Bearer rotated-access-token",
       );
-      if (url.pathname.endsWith("history")) return Response.json([]);
       return Response.json({ all: "2026-10-07T11:59:00Z" });
     },
   });
@@ -389,15 +398,20 @@ test("Simkl marks history idle after 40 minutes and does not cache active status
   const env = { SIMKL_CLIENT_ID: "aging", SIMKL_ACCESS_TOKEN: "token" };
   const d = deps((url) =>
     url.pathname.endsWith("activities")
-      ? { all: "2026-10-07T11:20:01Z" }
-      : url.searchParams.get("type") === "movies"
-        ? [
-            {
-              watched_at: "2026-10-07T11:20:01Z",
-              movie: { title: "Recent until now", ids: { simkl: 123 } },
-            },
-          ]
-        : [],
+      ? {
+          all: "2026-10-07T11:20:01Z",
+          movies: { completed: "2026-10-07T11:20:01Z" },
+        }
+      : url.pathname === "/sync/all-items/movies/completed"
+        ? {
+            movies: [
+              {
+                last_watched_at: "2026-10-07T11:20:01Z",
+                movie: { title: "Recent until now", ids: { simkl: 123 } },
+              },
+            ],
+          }
+        : {},
   );
   assert.equal((await getSimkl(env, d)).data?.isActive, true);
   assert.equal(
@@ -546,44 +560,54 @@ test("coding remains active across UTC and account-local midnight", async () => 
     );
   }
 });
-test("Simkl excludes old watch dates even when recently rated", async () => {
+test("Simkl excludes old watch dates even when recent activity was reported", async () => {
   const result = await getSimkl(
     { SIMKL_CLIENT_ID: "old-rating", SIMKL_ACCESS_TOKEN: "token" },
     deps((url) =>
       url.pathname.endsWith("activities")
-        ? { all: "2026-10-07T11:00:00Z" }
-        : url.searchParams.get("type") === "movies"
-          ? [
-              {
-                watched_at: "2020-01-01T00:00:00Z",
-                user_rated_at: "2026-10-07T11:00:00Z",
-                movie: { title: "Old movie", ids: { simkl: 123 } },
-              },
-            ]
-          : [],
+        ? {
+            all: "2026-10-07T11:00:00Z",
+            movies: { completed: "2026-10-07T11:00:00Z" },
+          }
+        : url.pathname === "/sync/all-items/movies/completed"
+          ? {
+              movies: [
+                {
+                  last_watched_at: "2020-01-01T00:00:00Z",
+                  user_rated_at: "2026-10-07T11:00:00Z",
+                  movie: { title: "Old movie", ids: { simkl: 123 } },
+                },
+              ],
+            }
+          : {},
     ),
   );
   assert.equal(result.state, "empty");
   assert.equal(result.data, undefined);
 });
-test("Simkl cached observations expire when leaving the recent window", async () => {
-  const watchedAt = new Date(now - 30 * 86400000 + 1000).toISOString();
+test("Simkl cached observations turn idle after leaving the 40-minute window", async () => {
+  const watchedAt = new Date(now - 39 * 60000).toISOString();
   const d = deps((url) =>
     url.pathname.endsWith("activities")
-      ? { all: "2026-10-07T11:00:00Z" }
-      : url.searchParams.get("type") === "movies"
-        ? [
-            {
-              watched_at: watchedAt,
-              movie: { title: "Recent until now", ids: { simkl: 123 } },
-            },
-          ]
-        : [],
+      ? {
+          all: watchedAt,
+          movies: { completed: watchedAt },
+        }
+      : url.pathname === "/sync/all-items/movies/completed"
+        ? {
+            movies: [
+              {
+                last_watched_at: watchedAt,
+                movie: { title: "Recent until now", ids: { simkl: 123 } },
+              },
+            ],
+          }
+        : {},
   );
   const env = { SIMKL_CLIENT_ID: "boundary", SIMKL_ACCESS_TOKEN: "token" };
   assert.equal((await getSimkl(env, d)).state, "available");
   assert.equal(
-    (await getSimkl(env, { ...d, now: () => now + 2000 })).state,
-    "empty",
+    (await getSimkl(env, { ...d, now: () => now + 2 * 60000 })).data?.isActive,
+    false,
   );
 });

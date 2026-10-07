@@ -86,26 +86,73 @@ export async function getSimkl(
       }
       return { state: "empty" };
     }
-    const history = await Promise.all(
-      (
-        [
-          ["anime", "anime", "anime"],
-          ["shows", "tv", "show"],
-          ["movies", "movie", "movie"],
-        ] as const
-      ).map(async ([type, mediaType, contentKey]) => {
-        const url = new URL("https://api.simkl.com/sync/history");
-        url.searchParams.set("type", type);
-        url.searchParams.set(
-          "date_from",
-          new Date(deps.now() - 30 * 86400000).toISOString(),
+    const recentCutoff = deps.now() - 40 * 60000;
+    const recentStatuses = (domain: string, statuses: readonly string[]) => {
+      const updates = activity[domain];
+      if (!updates || typeof updates !== "object" || Array.isArray(updates))
+        return [];
+      return statuses.filter((status) => {
+        const updatedAt = timestamp(
+          (updates as Record<string, unknown>)[status],
         );
-        url.searchParams.set("limit", "100");
-        const raw = await fetchSimklJson(url);
-        if (raw === null) return { mediaType, contentKey, entries: [] };
-        if (!Array.isArray(raw)) throw Error("Invalid Simkl history");
-        return { mediaType, contentKey, entries: raw };
-      }),
+        return Boolean(
+          updatedAt &&
+            Date.parse(updatedAt) <= deps.now() &&
+            Date.parse(updatedAt) > recentCutoff,
+        );
+      });
+    };
+    const changedTypes = [
+      {
+        activityDomain: "anime",
+        statuses: ["watching", "completed"],
+        apiType: "anime",
+        mediaType: "anime",
+        contentKey: "show",
+      },
+      {
+        activityDomain: "tv_shows",
+        statuses: ["watching", "completed"],
+        apiType: "shows",
+        mediaType: "tv",
+        contentKey: "show",
+      },
+      {
+        activityDomain: "movies",
+        statuses: ["completed"],
+        apiType: "movies",
+        mediaType: "movie",
+        contentKey: "movie",
+      },
+    ] as const;
+    const history = await Promise.all(
+      changedTypes
+        .flatMap(
+          ({ activityDomain, statuses, apiType, mediaType, contentKey }) =>
+            recentStatuses(activityDomain, statuses).map((status) => ({
+              apiType,
+              status,
+              mediaType,
+              contentKey,
+            })),
+        )
+        .map(async ({ apiType, status, mediaType, contentKey }) => {
+          const url = new URL(
+            `https://api.simkl.com/sync/all-items/${apiType}/${status}`,
+          );
+          url.searchParams.set(
+            "date_from",
+            new Date(recentCutoff).toISOString(),
+          );
+          const raw = await fetchSimklJson(url);
+          if (raw === null) return { mediaType, contentKey, entries: [] };
+          const payload = record(raw);
+          const entries = payload[apiType];
+          if (entries === undefined)
+            return { mediaType, contentKey, entries: [] };
+          if (!Array.isArray(entries)) throw Error("Invalid Simkl item delta");
+          return { mediaType, contentKey, entries };
+        }),
     );
     const candidates: NonNullable<LiveActivityResponse["simkl"]>[] = [];
     for (const { mediaType, contentKey, entries } of history) {
@@ -115,7 +162,7 @@ export async function getSimkl(
           item[contentKey] ?? (mediaType === "anime" ? item.show : undefined),
         );
         const title = safeText(content.title);
-        const observedAt = timestamp(item.watched_at);
+        const observedAt = timestamp(item.last_watched_at ?? item.watched_at);
         if (
           !title ||
           !observedAt ||
