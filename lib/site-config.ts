@@ -4,6 +4,14 @@ export const siteOrigins = [
   "https://hugodotnet.dev",
 ] as const;
 export const sitemapOrigin = siteOrigins[0];
+const javaLinkedInProfile = "https://www.linkedin.com/in/hugo-java/";
+const dotnetLinkedInProfile = "https://www.linkedin.com/in/vitorhugo-dotnet/";
+export function linkedInProfileForHostname(hostname: string): string {
+  const host = hostname.toLowerCase().replace(/\.$/, "");
+  return host === "hugojava.dev" || host.endsWith(".hugojava.dev")
+    ? javaLinkedInProfile
+    : dotnetLinkedInProfile;
+}
 export const siteTitle = "Hugo — Entre código e caos";
 export const siteDescription =
   "Vitor Hugo. Full-stack developer: Java, Spring, C#, .NET. Produtos, apps Android e experimentos.";

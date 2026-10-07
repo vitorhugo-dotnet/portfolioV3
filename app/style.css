@@ -84,6 +84,12 @@ nav a:hover,
 .header-link {
   font: 12px monospace;
 }
+.header-socials {
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+  flex-shrink: 0;
+}
 .mobile-menu {
   display: none;
 }
@@ -762,9 +768,13 @@ footer > a:last-child {
   header {
     height: 68px;
   }
-  .header-link {
+  .header-socials {
     margin-left: auto;
     margin-right: 20px;
+    gap: 12px;
+  }
+  .header-link {
+    margin: 0;
   }
   .mobile-menu {
     display: block;

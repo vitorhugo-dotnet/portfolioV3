@@ -12,6 +12,13 @@ import {
   TechnologyBadges,
   useActiveSection,
 } from "../components/scroll-motion";
+import {
+  fetchGitHubUsername,
+  githubProfileUrl,
+  githubRepositoryUrl,
+  githubUsernameLookup,
+} from "../lib/github.ts";
+import { linkedInProfileForHostname } from "../lib/site-config.ts";
 
 type StudyLanguage = "Java" | "C#";
 type StudyFilter = "Todos" | StudyLanguage;
@@ -52,7 +59,6 @@ type ExternalProps = AnchorHTMLAttributes<HTMLAnchorElement> & {
   href: string;
   children: ReactNode;
 };
-const gh = "https://github.com/vitorhugo-dotnet/";
 const studies = [
   [
     "springboot-microservice-resilience",
@@ -191,8 +197,16 @@ export default function Page() {
   const [repos, setRepos] = useState<Repository[]>([]);
   const [menu, setMenu] = useState(false);
   const [motion, setMotion] = useState(true);
+  const [githubUsername, setGithubUsername] = useState(githubUsernameLookup);
+  const [linkedinProfile, setLinkedinProfile] = useState(
+    linkedInProfileForHostname(""),
+  );
+  const gh = githubProfileUrl(githubUsername);
+  const githubRepo = (repository: string) =>
+    githubRepositoryUrl(githubUsername, repository);
   const activeSection = useActiveSection();
   useEffect(() => {
+    setLinkedinProfile(linkedInProfileForHostname(window.location.hostname));
     fetch("/repos.json")
       .then(async (r) => r.json() as Promise<Repository[]>)
       .then(setRepos)
@@ -200,8 +214,10 @@ export default function Page() {
     let live = true;
     async function load() {
       try {
+        const username = await fetchGitHubUsername();
+        if (live) setGithubUsername(username);
         const r = await fetch(
-          "https://api.github.com/users/vitorhugo-dotnet/events/public?per_page=100",
+          `https://api.github.com/users/${encodeURIComponent(username)}/events/public?per_page=100`,
         );
         if (!r.ok) throw Error();
         const e = (await r.json()) as GitHubEvent[];
@@ -308,9 +324,14 @@ export default function Page() {
             Hub
           </Link>
         </nav>
-        <External className="header-link" href={gh}>
-          GitHub ↗
-        </External>
+        <div className="header-socials">
+          <External className="header-link" href={linkedinProfile}>
+            LinkedIn ↗
+          </External>
+          <External className="header-link" href={gh}>
+            GitHub ↗
+          </External>
+        </div>
       </header>
       <main>
         <HeroScene
@@ -407,10 +428,10 @@ export default function Page() {
                   <TechnologyBadges
                     labels={["C#", "Avalonia", "Flutter", "WebRTC"]}
                   />
-                  <External href={`${gh}desktop_dotnet_SonicRelay`}>
+                  <External href={githubRepo("desktop_dotnet_SonicRelay")}>
                     Desktop ↗
                   </External>
-                  <External href={`${gh}flutter_mobile-web_SonicRelay`}>
+                  <External href={githubRepo("flutter_mobile-web_SonicRelay")}>
                     Mobile ↗
                   </External>
                 </div>
@@ -435,7 +456,7 @@ export default function Page() {
                     codecs e comunicação entre dispositivos.
                   </p>
                   <TechnologyBadges labels={[".NET", "Avalonia", "WebRTC"]} />
-                  <External href={`${gh}dotnet_FrameRelay`}>
+                  <External href={githubRepo("dotnet_FrameRelay")}>
                     Explorar projeto ↗
                   </External>
                 </div>
@@ -465,10 +486,10 @@ export default function Page() {
                   <TechnologyBadges
                     labels={["Spring Boot", "React", "OAuth2"]}
                   />
-                  <External href={`${gh}SpringBoot-JobApplyTracker`}>
+                  <External href={githubRepo("SpringBoot-JobApplyTracker")}>
                     Backend ↗
                   </External>
-                  <External href={`${gh}React-JobApplyTracker`}>
+                  <External href={githubRepo("React-JobApplyTracker")}>
                     Frontend ↗
                   </External>
                 </div>
@@ -530,10 +551,10 @@ export default function Page() {
                     <span className="tag">0{i + 1} / MOBILE</span>
                     <h3>{name}</h3>
                     <p>{desc}</p>
-                    <External href={gh + repo}>
+                    <External href={githubRepo(repo)}>
                       Código & documentação ↗
                     </External>
-                    <External href={`${gh + repo}/releases`}>
+                    <External href={`${githubRepo(repo)}/releases`}>
                       Ver releases ↗
                     </External>
                   </article>
@@ -581,7 +602,7 @@ export default function Page() {
                   className="study-reveal"
                   delay={(i % 2) * 0.08}
                 >
-                  <External href={gh + repo} className="study">
+                  <External href={githubRepo(repo)} className="study">
                     <span className="tag">
                       {lang} <span>↗</span>
                     </span>
@@ -610,7 +631,7 @@ export default function Page() {
                   r.name.toLowerCase().includes(query.toLowerCase()),
                 )
                 .map((r) => (
-                  <External key={r.name} href={r.url}>
+                  <External key={r.name} href={githubRepo(r.name)}>
                     {r.name}
                     {r.archived ? " · arquivado" : ""} ↗
                   </External>
@@ -743,10 +764,7 @@ export default function Page() {
             <br />
             algo <em>interessante?</em>
           </h2>
-          <External
-            className="button"
-            href="https://www.linkedin.com/in/hugo-java/"
-          >
+          <External className="button" href={linkedinProfile}>
             Conversar no LinkedIn ↗
           </External>
           <External href={gh}>Explorar o GitHub ↗</External>
