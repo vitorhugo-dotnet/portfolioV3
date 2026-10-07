@@ -1,7 +1,7 @@
 import {
   fetchProviderJson,
-  ProviderHttpError,
   finiteNumber,
+  ProviderHttpError,
   record,
   safeText,
   timestamp,
