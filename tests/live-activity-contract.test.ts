@@ -20,6 +20,26 @@ test("public activity rejects invalid timestamps and provider states", () => {
     null,
   );
 });
+test("public activity requires an explicit Simkl activity state", () => {
+  const payload = {
+    generatedAt: "2026-10-07T12:00:00Z",
+    providerStates: {
+      coding: "empty",
+      spotify: "empty",
+      simkl: "available",
+      steam: "empty",
+    },
+    simkl: { mediaType: "anime", title: "Anime" },
+  };
+  assert.equal(parseLiveActivity(payload), null);
+  assert.equal(
+    parseLiveActivity({
+      ...payload,
+      simkl: { ...payload.simkl, isActive: false },
+    })?.simkl?.isActive,
+    false,
+  );
+});
 test("public text and URLs exclude credentials and unsafe hosts", () => {
   assert.equal(safeText("x".repeat(250))?.length, 200);
   assert.equal(safeHttpsUrl("javascript:alert(1)", ["example.com"]), undefined);

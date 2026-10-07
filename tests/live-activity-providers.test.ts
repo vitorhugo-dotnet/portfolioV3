@@ -21,8 +21,9 @@ function deps(
 }
 test("coding is active only for a recent nonfuture heartbeat and hides project paths", async () => {
   for (const [age, status] of [
-    [299, "active"],
-    [301, "idle"],
+    [899, "active"],
+    [900, "idle"],
+    [901, "idle"],
     [-10, "idle"],
   ] as const) {
     const d = deps((url) =>
@@ -54,6 +55,54 @@ test("coding is active only for a recent nonfuture heartbeat and hides project p
     assert.equal(result.data?.project, undefined);
     assert.ok(!JSON.stringify(result).includes("/secret"));
   }
+});
+test("coding uses a 15-minute window, prioritizes useful languages, and masks filenames", async () => {
+  const result = await getCoding(
+    { WAKATIME_API_KEY: "sentinel" },
+    deps((url) =>
+      url.pathname.endsWith("heartbeats")
+        ? {
+            data: [
+              {
+                time: now / 1000 - 60,
+                language: "Text",
+                entity: "/home/private/notes.txt",
+              },
+              {
+                time: now / 1000 - 120,
+                language: "Java",
+                entity: "/home/private/portfolio/src/PortfolioEditor.java",
+              },
+            ],
+          }
+        : { data: [] },
+    ),
+  );
+  assert.equal(result.data?.status, "active");
+  assert.equal(result.data?.language, "Java");
+  assert.equal(result.data?.file, "***folioEditor.java");
+  assert.ok(!JSON.stringify(result).includes("/home/private"));
+  assert.ok(!JSON.stringify(result).includes("notes.txt"));
+});
+test("coding is idle after 15 minutes and does not expose a full filename", async () => {
+  const result = await getCoding(
+    { WAKATIME_API_KEY: "sentinel" },
+    deps((url) =>
+      url.pathname.endsWith("heartbeats")
+        ? {
+            data: [
+              {
+                time: now / 1000 - 901,
+                language: "C#",
+                entity: "/home/private/PortfolioEditor.cs",
+              },
+            ],
+          }
+        : { data: [] },
+    ),
+  );
+  assert.equal(result.data?.status, "idle");
+  assert.equal(result.data?.file, "***rtfolioEditor.cs");
 });
 test("coding without a heartbeat does not invent current activity", async () => {
   const result = await getCoding(
@@ -155,28 +204,55 @@ test("Simkl checks last activity and returns only sanitized recent history", asy
     deps((url, init) => {
       if (url.pathname.endsWith("activities")) {
         assert.equal(init?.method, "POST");
-        return { all: "2026-10-07T10:00:00Z" };
+        return { all: "2026-10-07T11:30:00Z" };
       }
+      assert.equal(url.pathname, "/sync/history");
+      assert.equal(init?.method, undefined);
       assert.ok(url.searchParams.has("date_from"));
-      return {
-        anime: [
-          {
-            last_watched_at: "2026-10-07T10:00:00Z",
-            last_watched: "E12",
-            show: {
-              title: "Anime",
-              poster: "83/83975f751784587",
-              ids: { simkl: 40398 },
+      return url.searchParams.get("type") === "anime"
+        ? [
+            {
+              watched_at: "2026-10-07T11:30:00Z",
+              last_watched: "E12",
+              show: {
+                title: "Anime",
+                poster: "83/83975f751784587",
+                ids: { simkl: 40398 },
+              },
             },
-          },
-        ],
-      };
+          ]
+        : [];
     }),
   );
   assert.equal(result.data?.title, "Anime");
   assert.equal(result.data?.episode, 12);
   assert.equal(result.data?.mediaType, "anime");
+  assert.equal(result.data?.isActive, true);
   assert.ok(!JSON.stringify(result).includes("simkl-secret"));
+});
+test("Simkl marks history idle after 40 minutes and does not cache active status", async () => {
+  const env = { SIMKL_CLIENT_ID: "aging", SIMKL_ACCESS_TOKEN: "token" };
+  const d = deps((url) =>
+    url.pathname.endsWith("activities")
+      ? { all: "2026-10-07T11:20:01Z" }
+      : url.searchParams.get("type") === "movies"
+        ? [
+            {
+              watched_at: "2026-10-07T11:20:01Z",
+              movie: { title: "Recent until now", ids: { simkl: 123 } },
+            },
+          ]
+        : [],
+  );
+  assert.equal((await getSimkl(env, d)).data?.isActive, true);
+  assert.equal(
+    (await getSimkl(env, { ...d, now: () => now + 2000 })).data?.isActive,
+    false,
+  );
+  assert.equal(
+    (await getSimkl(env, { ...d, now: () => now + 1000 })).data?.isActive,
+    false,
+  );
 });
 test("Simkl handles null history and malformed payload independently", async () => {
   assert.equal(
@@ -321,15 +397,15 @@ test("Simkl excludes old watch dates even when recently rated", async () => {
     deps((url) =>
       url.pathname.endsWith("activities")
         ? { all: "2026-10-07T11:00:00Z" }
-        : {
-            movies: [
+        : url.searchParams.get("type") === "movies"
+          ? [
               {
                 watched_at: "2020-01-01T00:00:00Z",
                 user_rated_at: "2026-10-07T11:00:00Z",
                 movie: { title: "Old movie", ids: { simkl: 123 } },
               },
-            ],
-          },
+            ]
+          : [],
     ),
   );
   assert.equal(result.state, "empty");
@@ -340,14 +416,14 @@ test("Simkl cached observations expire when leaving the recent window", async ()
   const d = deps((url) =>
     url.pathname.endsWith("activities")
       ? { all: "2026-10-07T11:00:00Z" }
-      : {
-          movies: [
+      : url.searchParams.get("type") === "movies"
+        ? [
             {
               watched_at: watchedAt,
               movie: { title: "Recent until now", ids: { simkl: 123 } },
             },
-          ],
-        },
+          ]
+        : [],
   );
   const env = { SIMKL_CLIENT_ID: "boundary", SIMKL_ACCESS_TOKEN: "token" };
   assert.equal((await getSimkl(env, d)).state, "available");

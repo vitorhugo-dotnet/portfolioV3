@@ -60,7 +60,7 @@ export async function getCoding(
         parts.find((item) => item.type === type)?.value;
       return `${part("year")}-${part("month")}-${part("day")}`;
     };
-    const startOfWindowDay = dateInTimezone(deps.now() - 300000);
+    const startOfWindowDay = dateInTimezone(deps.now() - 900000);
     const currentDay = dateInTimezone(deps.now());
     const dates = [...new Set([utcDay, currentDay, startOfWindowDay])];
     const heartbeats = [...heartbeatResponse.data];
@@ -78,16 +78,43 @@ export async function getCoding(
       if (!Array.isArray(response.data)) throw Error("Invalid coding payload");
       heartbeats.push(...response.data);
     }
-    const latest = heartbeats
+    const valid = heartbeats
       .map(record)
       .filter(
         (h) =>
           finiteNumber(h.time) !== undefined &&
           Number(h.time) * 1000 <= deps.now(),
       )
-      .sort((a, b) => Number(b.time) - Number(a.time))[0];
+      .sort((a, b) => Number(b.time) - Number(a.time));
+    const recent = valid.filter(
+      (h) => Number(h.time) * 1000 > deps.now() - 900000,
+    );
+    const latest = valid[0];
     if (!latest && !summary) return { state: "empty" };
     const age = latest ? deps.now() - Number(latest.time) * 1000 : Infinity;
+    const languagePriority = (language: unknown) => {
+      const name = safeText(language)?.toLowerCase();
+      if (!name) return 99;
+      const priority = ["java", "c#", "sql", "go", "python", "rust"];
+      const index = priority.indexOf(name);
+      if (index >= 0) return index;
+      if (name === "html" || name === "css") return 90;
+      if (name === "markdown" || name === "md") return 91;
+      if (name === "text" || name === "txt") return 92;
+      return 50;
+    };
+    const selected = [...(recent.length ? recent : valid)].sort(
+      (a, b) =>
+        languagePriority(a.language) - languagePriority(b.language) ||
+        Number(b.time) - Number(a.time),
+    )[0];
+    const fileName = (value: unknown) => {
+      if (typeof value !== "string") return undefined;
+      const baseName = value.split(/[\\/]/).pop()?.trim();
+      if (!baseName) return undefined;
+      const suffix = safeText(baseName)?.slice(-16);
+      return suffix ? `***${suffix}` : undefined;
+    };
     const topName = (value: unknown) =>
       Array.isArray(value) && value[0]
         ? safeText(record(value[0]).name)
@@ -98,10 +125,11 @@ export async function getCoding(
     return {
       state: "available",
       data: {
-        status: age >= 0 && age <= 300000 ? "active" : "idle",
+        status: age >= 0 && age < 900000 ? "active" : "idle",
         observedAt: latest && age >= 0 ? timestamp(latest.time) : undefined,
-        language: safeText(latest?.language) ?? topName(summary?.languages),
-        editor: safeText(latest?.editor) ?? topName(summary?.editors),
+        language: safeText(selected?.language) ?? topName(summary?.languages),
+        editor: safeText(selected?.editor) ?? topName(summary?.editors),
+        file: fileName(selected?.entity),
         project:
           env.EXPOSE_CODING_PROJECT === "true"
             ? safeText(latest?.project)

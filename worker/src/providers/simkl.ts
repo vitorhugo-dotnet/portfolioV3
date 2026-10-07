@@ -47,30 +47,52 @@ export async function getSimkl(
       deps.now() - cached.checkedAt < 3600000
     ) {
       const observedAt = cached.result.data?.observedAt;
-      if (!observedAt || Date.parse(observedAt) >= deps.now() - 30 * 86400000)
+      if (!observedAt || Date.parse(observedAt) >= deps.now() - 30 * 86400000) {
+        if (cached.result.data && observedAt) {
+          return {
+            ...cached.result,
+            data: {
+              ...cached.result.data,
+              isActive:
+                Date.parse(observedAt) <= deps.now() &&
+                Date.parse(observedAt) > deps.now() - 40 * 60000,
+            },
+          };
+        }
         return cached.result;
+      }
       return { state: "empty" };
     }
-    const url = new URL("https://api.simkl.com/sync/all-items/");
-    url.searchParams.set(
-      "date_from",
-      new Date(deps.now() - 30 * 86400000).toISOString(),
+    const history = await Promise.all(
+      (
+        [
+          ["anime", "anime", "anime"],
+          ["shows", "tv", "show"],
+          ["movies", "movie", "movie"],
+        ] as const
+      ).map(async ([type, mediaType, contentKey]) => {
+        const url = new URL("https://api.simkl.com/sync/history");
+        url.searchParams.set("type", type);
+        url.searchParams.set(
+          "date_from",
+          new Date(deps.now() - 30 * 86400000).toISOString(),
+        );
+        url.searchParams.set("limit", "100");
+        const raw = await fetchProviderJson(url, { headers }, deps);
+        if (raw === null) return { mediaType, contentKey, entries: [] };
+        if (!Array.isArray(raw)) throw Error("Invalid Simkl history");
+        return { mediaType, contentKey, entries: raw };
+      }),
     );
-    const raw = await fetchProviderJson(url, { headers }, deps);
-    const data = raw === null ? {} : record(raw);
     const candidates: NonNullable<LiveActivityResponse["simkl"]>[] = [];
-    for (const [key, mediaType, contentKey] of [
-      ["anime", "anime", "show"],
-      ["shows", "tv", "show"],
-      ["movies", "movie", "movie"],
-    ] as const) {
-      if (data[key] !== undefined && !Array.isArray(data[key]))
-        throw Error("Invalid Simkl history");
-      for (const rawItem of (data[key] ?? []) as unknown[]) {
+    for (const { mediaType, contentKey, entries } of history) {
+      for (const rawItem of entries) {
         const item = record(rawItem);
-        const content = record(item[contentKey]);
+        const content = record(
+          item[contentKey] ?? (mediaType === "anime" ? item.show : undefined),
+        );
         const title = safeText(content.title);
-        const observedAt = timestamp(item.last_watched_at ?? item.watched_at);
+        const observedAt = timestamp(item.watched_at);
         if (
           !title ||
           !observedAt ||
@@ -90,15 +112,24 @@ export async function getSimkl(
           /^\d+\/[a-f\d]+$/.test(content.poster)
             ? content.poster
             : undefined;
+        const episode = item.episode ? record(item.episode) : {};
         const episodeMatch =
           typeof item.last_watched === "string"
             ? /E(\d+)$/.exec(item.last_watched)
             : null;
+        const episodeNumber =
+          typeof episode.number === "number" &&
+          Number.isSafeInteger(episode.number)
+            ? episode.number
+            : episodeMatch
+              ? Number(episodeMatch[1])
+              : undefined;
         candidates.push({
           mediaType,
           title,
           observedAt,
-          episode: episodeMatch ? Number(episodeMatch[1]) : undefined,
+          episode: episodeNumber,
+          isActive: Date.parse(observedAt) > deps.now() - 40 * 60000,
           posterUrl: poster
             ? `https://simkl.in/posters/${poster}_m.webp`
             : undefined,

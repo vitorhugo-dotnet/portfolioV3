@@ -14,6 +14,7 @@ export interface LiveActivityResponse {
     project?: string;
     language?: string;
     editor?: string;
+    file?: string;
     durationMinutes?: number;
   };
   spotify?: Observation & {
@@ -28,6 +29,7 @@ export interface LiveActivityResponse {
     mediaType: "anime" | "tv" | "movie";
     title: string;
     episode?: number;
+    isActive: boolean;
     posterUrl?: string;
     externalUrl?: string;
   };
@@ -82,14 +84,19 @@ export function parseLiveActivity(value: unknown): LiveActivityResponse | null {
       if (
         provider === "simkl" &&
         (!["anime", "tv", "movie"].includes(String(entry.mediaType)) ||
-          typeof entry.title !== "string")
+          typeof entry.title !== "string" ||
+          typeof entry.isActive !== "boolean")
       )
         return null;
       for (const [key, field] of Object.entries(entry)) {
         if (["durationMinutes", "episode"].includes(key)) {
           if (typeof field !== "number" || !Number.isFinite(field) || field < 0)
             return null;
-        } else if (!["isPlaying"].includes(key) && typeof field !== "string")
+        } else if (
+          ["isPlaying", "isActive"].includes(key)
+            ? typeof field !== "boolean"
+            : typeof field !== "string"
+        )
           return null;
         if (key.endsWith("Url") && typeof field === "string") {
           try {

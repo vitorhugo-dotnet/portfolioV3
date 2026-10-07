@@ -27,12 +27,14 @@ function details(
   provider: Provider,
   data: LiveActivityResponse,
   stale: boolean,
+  now: number,
 ) {
   if (provider === "coding" && data.coding)
     return {
       title:
         data.coding.project ?? data.coding.language ?? "Entre ideias e código",
       subtitle: [
+        data.coding.file,
         data.coding.editor,
         data.coding.durationMinutes !== undefined
           ? `${data.coding.durationMinutes} min hoje`
@@ -41,7 +43,9 @@ function details(
         .filter(Boolean)
         .join(" · "),
       status:
-        data.coding.status === "active" && !stale
+        data.coding.observedAt &&
+        now >= Date.parse(data.coding.observedAt) &&
+        now - Date.parse(data.coding.observedAt) < 15 * 60000
           ? "Codando agora"
           : "Atividade de código recente",
       observedAt: data.coding.observedAt,
@@ -71,7 +75,12 @@ function details(
       ]
         .filter(Boolean)
         .join(" · "),
-      status: "Assistido recentemente",
+      status:
+        data.simkl.isActive &&
+        data.simkl.observedAt &&
+        now - Date.parse(data.simkl.observedAt) < 40 * 60000
+          ? "Assistindo agora"
+          : "Assistido recentemente",
       image: data.simkl.posterUrl,
       url: data.simkl.externalUrl,
       observedAt: data.simkl.observedAt,
@@ -157,10 +166,23 @@ export function LiveActivitySection() {
   const activeCards = data
     ? providers.flatMap((provider) => {
         const isActive =
-          (provider === "coding" && data.coding?.status === "active") ||
+          (provider === "coding" &&
+            data.coding?.observedAt &&
+            clock >= Date.parse(data.coding.observedAt) &&
+            clock - Date.parse(data.coding.observedAt) < 15 * 60000) ||
           (provider === "spotify" && data.spotify?.isPlaying) ||
+          (provider === "simkl" &&
+            data.simkl?.isActive &&
+            data.simkl.observedAt &&
+            clock >= Date.parse(data.simkl.observedAt) &&
+            clock - Date.parse(data.simkl.observedAt) < 40 * 60000) ||
           (provider === "steam" && data.steam?.isPlaying);
-        const info = isActive && !stale ? details(provider, data, stale) : null;
+        const requiresFreshData =
+          provider === "spotify" || provider === "steam";
+        const info =
+          isActive && (!requiresFreshData || !stale)
+            ? details(provider, data, stale, clock)
+            : null;
         return info ? [{ provider, info }] : [];
       })
     : [];
