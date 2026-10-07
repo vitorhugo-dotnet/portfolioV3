@@ -89,7 +89,6 @@ async function probeSimkl(
   return probeJson(
     new URL("https://api.simkl.com/sync/activities"),
     {
-      method: "POST",
       headers: {
         Authorization: `Bearer ${env.SIMKL_ACCESS_TOKEN}`,
         "simkl-api-key": env.SIMKL_CLIENT_ID,

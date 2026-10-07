@@ -307,7 +307,7 @@ test("Simkl checks last activity and returns only sanitized recent history", asy
     { SIMKL_CLIENT_ID: "client", SIMKL_ACCESS_TOKEN: "simkl-secret" },
     deps((url, init) => {
       if (url.pathname.endsWith("activities")) {
-        assert.equal(init?.method, "POST");
+        assert.equal(init?.method, undefined);
         return { all: "2026-10-07T11:30:00Z" };
       }
       assert.equal(url.pathname, "/sync/history");

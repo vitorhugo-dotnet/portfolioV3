@@ -35,7 +35,7 @@ export async function getSimkl(
     const activity = record(
       await fetchProviderJson(
         new URL("https://api.simkl.com/sync/activities"),
-        { method: "POST", headers },
+        { headers },
         deps,
       ),
     );
