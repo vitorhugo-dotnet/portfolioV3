@@ -99,7 +99,7 @@ export default {
   fetch(request: Request, env: Env, ctx: Context): Promise<Response> {
     const cache = (caches as unknown as { default: ActivityCache }).default;
     return createActivityHandler({
-      fetch,
+      fetch: (input, init) => globalThis.fetch(input, init),
       now: Date.now,
       cache,
       collect: collectActivity,
