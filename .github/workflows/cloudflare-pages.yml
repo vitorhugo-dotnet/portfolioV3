@@ -99,4 +99,5 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           packageManager: npm
-          command: pages deploy out --project-name="$CLOUDFLARE_PAGES_PROJECT" --branch=main --commit-hash=${{ github.sha }} --commit-dirty=false
+          # Action arguments do not expand shell environment variables.
+          command: pages deploy out --project-name=${{ vars.CLOUDFLARE_PAGES_PROJECT }} --branch=main --commit-hash=${{ github.sha }} --commit-dirty=false
