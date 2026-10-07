@@ -1,1 +1,31 @@
-{"name":"hugo-code-dojo","private":true,"scripts":{"build":"next build"},"dependencies":{"next":"^16.4.0","react":"^19.2.0","react-dom":"^19.2.0"}}
+{
+  "name": "hugo-code-dojo",
+  "private": true,
+  "scripts": {
+    "build": "next build",
+    "dev": "next dev",
+    "typecheck": "tsc --noEmit",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "lint": "biome lint .",
+    "check": "biome check .",
+    "check:write": "biome check --write .",
+    "ci": "biome ci ."
+  },
+  "dependencies": {
+    "motion": "^14.0.0",
+    "next": "^16.4.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.15",
+    "@types/node": "^26.6.4",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "typescript": "^7.0.2"
+  },
+  "engines": {
+    "node": ">=24 <25"
+  }
+}

@@ -1,0 +1,102 @@
+name: Static Cloudflare Pages
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run ci
+      - run: npm run typecheck
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      # There is currently no automated test suite. A future test script is
+      # picked up here automatically; failures still fail this job.
+      - name: Run tests when configured
+        run: |
+          if npm pkg get scripts.test | grep -q '"'; then
+            npm test
+          else
+            echo 'No automated test suite configured; see README validation guidance.'
+          fi
+
+  build:
+    needs: [quality, test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Verify static routes
+        run: |
+          test -d out/_next
+          for route in index hub sonicrelay/privacy-policy the-universe-decides/privacy-policy; do
+            test -s "out/$route.html"
+          done
+          test -s out/404.html
+      - uses: actions/upload-artifact@v7
+        with:
+          name: portfolio-static-${{ github.sha }}
+          path: out/
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 7
+
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_PAGES_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
+    steps:
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - uses: actions/download-artifact@v8
+        with:
+          name: portfolio-static-${{ github.sha }}
+          path: out/
+      - name: Validate project configuration
+        run: |
+          if [[ ! "$CLOUDFLARE_PAGES_PROJECT" =~ ^[a-z0-9][a-z0-9-]{0,57}[a-z0-9]$ ]]; then
+            echo 'Set CLOUDFLARE_PAGES_PROJECT to the existing Cloudflare Pages project name (2–59 characters).'
+            exit 1
+          fi
+          test -s out/index.html
+      - name: Deploy the build artifact
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          packageManager: npm
+          command: pages deploy out --project-name="$CLOUDFLARE_PAGES_PROJECT" --branch=main --commit-hash=${{ github.sha }} --commit-dirty=false
