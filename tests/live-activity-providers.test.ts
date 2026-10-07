@@ -308,11 +308,23 @@ test("Simkl checks last activity and returns only sanitized recent history", asy
     deps((url, init) => {
       if (url.pathname.endsWith("activities")) {
         assert.equal(init?.method, undefined);
+        assert.equal(url.searchParams.get("app-name"), "portfolio-v3");
+        assert.equal(url.searchParams.get("app-version"), "3.0.0");
+        assert.equal(
+          new Headers(init?.headers).get("User-Agent"),
+          "portfolio-v3/3.0.0",
+        );
         return { all: "2026-10-07T11:30:00Z" };
       }
       assert.equal(url.pathname, "/sync/history");
       assert.equal(init?.method, undefined);
       assert.ok(url.searchParams.has("date_from"));
+      assert.equal(url.searchParams.get("app-name"), "portfolio-v3");
+      assert.equal(url.searchParams.get("app-version"), "3.0.0");
+      assert.equal(
+        new Headers(init?.headers).get("User-Agent"),
+        "portfolio-v3/3.0.0",
+      );
       return url.searchParams.get("type") === "anime"
         ? [
             {

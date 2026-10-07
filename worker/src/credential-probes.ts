@@ -1,3 +1,4 @@
+import { simklApiRequest } from "./simkl-http.ts";
 import { refreshSpotifyToken, SpotifyTokenError } from "./spotify-token.ts";
 import type {
   CredentialProbeResult,
@@ -86,19 +87,13 @@ async function probeSimkl(
 ): Promise<CredentialProbeResult> {
   if (!env.SIMKL_CLIENT_ID || !env.SIMKL_ACCESS_TOKEN)
     return { state: "unconfigured" };
-  return probeJson(
+  const request = simklApiRequest(
     new URL("https://api.simkl.com/sync/activities"),
-    {
-      headers: {
-        Authorization: `Bearer ${env.SIMKL_ACCESS_TOKEN}`,
-        "simkl-api-key": env.SIMKL_CLIENT_ID,
-      },
-    },
-    deps,
-    (payload) =>
-      Boolean(
-        payload && typeof payload === "object" && !Array.isArray(payload),
-      ),
+    env.SIMKL_CLIENT_ID,
+    env.SIMKL_ACCESS_TOKEN,
+  );
+  return probeJson(request.url, { headers: request.headers }, deps, (payload) =>
+    Boolean(payload && typeof payload === "object" && !Array.isArray(payload)),
   );
 }
 

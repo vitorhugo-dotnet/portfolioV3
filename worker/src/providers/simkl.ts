@@ -6,6 +6,7 @@ import {
   safeText,
   timestamp,
 } from "../provider-http.ts";
+import { simklApiRequest } from "../simkl-http.ts";
 import type { Env, ProviderDependencies, ProviderResult } from "../types.ts";
 
 const snapshots = new WeakMap<
@@ -21,21 +22,20 @@ export async function getSimkl(
   env: Env,
   deps: ProviderDependencies,
 ): Promise<ProviderResult<"simkl">> {
-  if (!env.SIMKL_CLIENT_ID || !env.SIMKL_ACCESS_TOKEN)
-    return { state: "unconfigured" };
+  const clientId = env.SIMKL_CLIENT_ID;
+  const accessToken = env.SIMKL_ACCESS_TOKEN;
+  if (!clientId || !accessToken) return { state: "unconfigured" };
   try {
-    const identity = JSON.stringify([
-      env.SIMKL_CLIENT_ID,
-      env.SIMKL_ACCESS_TOKEN,
-    ]);
-    const headers = {
-      Authorization: `Bearer ${env.SIMKL_ACCESS_TOKEN}`,
-      "simkl-api-key": env.SIMKL_CLIENT_ID,
-    };
+    const identity = JSON.stringify([clientId, accessToken]);
+    const activityRequest = simklApiRequest(
+      new URL("https://api.simkl.com/sync/activities"),
+      clientId,
+      accessToken,
+    );
     const activity = record(
       await fetchProviderJson(
-        new URL("https://api.simkl.com/sync/activities"),
-        { headers },
+        activityRequest.url,
+        { headers: activityRequest.headers },
         deps,
       ),
     );
@@ -78,7 +78,12 @@ export async function getSimkl(
           new Date(deps.now() - 30 * 86400000).toISOString(),
         );
         url.searchParams.set("limit", "100");
-        const raw = await fetchProviderJson(url, { headers }, deps);
+        const historyRequest = simklApiRequest(url, clientId, accessToken);
+        const raw = await fetchProviderJson(
+          historyRequest.url,
+          { headers: historyRequest.headers },
+          deps,
+        );
         if (raw === null) return { mediaType, contentKey, entries: [] };
         if (!Array.isArray(raw)) throw Error("Invalid Simkl history");
         return { mediaType, contentKey, entries: raw };

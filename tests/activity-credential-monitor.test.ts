@@ -103,10 +103,16 @@ test("credential probes authenticate to each official provider using minimal end
     (request) => request.url.hostname === "api.simkl.com",
   );
   assert.equal(simkl?.url.pathname, "/sync/activities");
+  assert.equal(simkl?.url.searchParams.get("app-name"), "portfolio-v3");
+  assert.equal(simkl?.url.searchParams.get("app-version"), "3.0.0");
   assert.equal(simkl?.init?.method, undefined);
   assert.equal(
     new Headers(simkl?.init?.headers).get("simkl-api-key"),
     "simkl-client",
+  );
+  assert.equal(
+    new Headers(simkl?.init?.headers).get("User-Agent"),
+    "portfolio-v3/3.0.0",
   );
   const steam = requests.find(
     (request) => request.url.hostname === "api.steampowered.com",
