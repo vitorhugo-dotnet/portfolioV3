@@ -267,3 +267,74 @@ test("missing credentials skip calls and provider failures remain isolated", asy
     "unconfigured",
   );
 });
+
+test("coding remains active across UTC and account-local midnight", async () => {
+  for (const [time, timezone, heartbeatDay] of [
+    ["2026-10-07T00:01:00Z", "UTC", "2026-10-06"],
+    ["2026-10-07T03:01:00Z", "America/Fortaleza", "2026-10-06"],
+    ["2026-10-07T00:01:00Z", "America/Fortaleza", "2026-10-06"],
+  ]) {
+    const clock = Date.parse(time);
+    const d = deps((url) =>
+      url.pathname.endsWith("heartbeats")
+        ? {
+            timezone,
+            data:
+              url.searchParams.get("date") === heartbeatDay
+                ? [{ time: clock / 1000 - 120, language: "TypeScript" }]
+                : [],
+          }
+        : { data: [{ grand_total: { total_seconds: 60 } }] },
+    );
+    const result = await getCoding(
+      { WAKATIME_API_KEY: "key" },
+      { ...d, now: () => clock },
+    );
+    assert.equal(result.data?.status, "active", `${timezone} at ${time}`);
+    assert.equal(
+      result.data?.observedAt,
+      new Date(clock - 120000).toISOString(),
+    );
+  }
+});
+test("Simkl excludes old watch dates even when recently rated", async () => {
+  const result = await getSimkl(
+    { SIMKL_CLIENT_ID: "old-rating", SIMKL_ACCESS_TOKEN: "token" },
+    deps((url) =>
+      url.pathname.endsWith("activities")
+        ? { all: "2026-10-07T11:00:00Z" }
+        : {
+            movies: [
+              {
+                watched_at: "2020-01-01T00:00:00Z",
+                user_rated_at: "2026-10-07T11:00:00Z",
+                movie: { title: "Old movie", ids: { simkl: 123 } },
+              },
+            ],
+          },
+    ),
+  );
+  assert.equal(result.state, "empty");
+  assert.equal(result.data, undefined);
+});
+test("Simkl cached observations expire when leaving the recent window", async () => {
+  const watchedAt = new Date(now - 30 * 86400000 + 1000).toISOString();
+  const d = deps((url) =>
+    url.pathname.endsWith("activities")
+      ? { all: "2026-10-07T11:00:00Z" }
+      : {
+          movies: [
+            {
+              watched_at: watchedAt,
+              movie: { title: "Recent until now", ids: { simkl: 123 } },
+            },
+          ],
+        },
+  );
+  const env = { SIMKL_CLIENT_ID: "boundary", SIMKL_ACCESS_TOKEN: "token" };
+  assert.equal((await getSimkl(env, d)).state, "available");
+  assert.equal(
+    (await getSimkl(env, { ...d, now: () => now + 2000 })).state,
+    "empty",
+  );
+});

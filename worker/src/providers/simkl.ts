@@ -44,8 +44,12 @@ export async function getSimkl(
       cached?.identity === identity &&
       cached.marker === marker &&
       deps.now() - cached.checkedAt < 3600000
-    )
-      return cached.result;
+    ) {
+      const observedAt = cached.result.data?.observedAt;
+      if (!observedAt || Date.parse(observedAt) >= deps.now() - 30 * 86400000)
+        return cached.result;
+      return { state: "empty" };
+    }
     const url = new URL("https://api.simkl.com/sync/all-items/");
     url.searchParams.set(
       "date_from",
@@ -66,7 +70,12 @@ export async function getSimkl(
         const content = record(item[contentKey]);
         const title = safeText(content.title);
         const observedAt = timestamp(item.last_watched_at ?? item.watched_at);
-        if (!title || !observedAt || Date.parse(observedAt) > deps.now())
+        if (
+          !title ||
+          !observedAt ||
+          Date.parse(observedAt) > deps.now() ||
+          Date.parse(observedAt) < deps.now() - 30 * 86400000
+        )
           continue;
         const ids = content.ids ? record(content.ids) : {};
         const id =
