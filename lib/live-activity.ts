@@ -38,6 +38,8 @@ export interface LiveActivityResponse {
     game?: string;
     appId?: string;
     imageUrl?: string;
+    coverUrl?: string;
+    totalPlaytimeMinutes?: number;
     externalUrl?: string;
   };
 }
@@ -89,7 +91,9 @@ export function parseLiveActivity(value: unknown): LiveActivityResponse | null {
       )
         return null;
       for (const [key, field] of Object.entries(entry)) {
-        if (["durationMinutes", "episode"].includes(key)) {
+        if (
+          ["durationMinutes", "episode", "totalPlaytimeMinutes"].includes(key)
+        ) {
           if (typeof field !== "number" || !Number.isFinite(field) || field < 0)
             return null;
         } else if (

@@ -1353,6 +1353,9 @@ fieldset.activity-tabs {
   min-width: 0;
 }
 .live-card {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   height: 100%;
   min-height: 245px;
   padding: 1.6rem;
@@ -1360,6 +1363,32 @@ fieldset.activity-tabs {
   background: #10171d;
   display: flex;
   flex-direction: column;
+}
+.live-card-cover {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  pointer-events: none;
+}
+.live-card-cover img {
+  object-fit: cover;
+  object-position: center;
+  opacity: 0.38;
+}
+.live-card-cover::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    rgb(16 23 29 / 98%) 0%,
+    rgb(16 23 29 / 88%) 48%,
+    rgb(16 23 29 / 42%) 100%
+  );
+}
+.live-card > :not(.live-card-cover) {
+  position: relative;
+  z-index: 1;
 }
 .live-card-heading {
   display: flex;

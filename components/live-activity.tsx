@@ -49,6 +49,7 @@ function details(
           ? "Codando agora"
           : "Atividade de código recente",
       observedAt: data.coding.observedAt,
+      cover: undefined,
     };
   if (provider === "spotify" && data.spotify)
     return {
@@ -61,6 +62,7 @@ function details(
       image: data.spotify.artworkUrl,
       url: data.spotify.externalUrl,
       observedAt: data.spotify.observedAt,
+      cover: undefined,
     };
   if (provider === "simkl" && data.simkl)
     return {
@@ -84,19 +86,29 @@ function details(
       image: data.simkl.posterUrl,
       url: data.simkl.externalUrl,
       observedAt: data.simkl.observedAt,
+      cover: undefined,
     };
   if (provider === "steam" && data.steam)
     return {
       title: data.steam.game ?? "Jogo",
-      subtitle:
+      subtitle: [
         data.steam.isPlaying && !stale
           ? "Uma pausa entre builds."
-          : "Um dos jogos das últimas duas semanas.",
+          : "Jogo recente.",
+        data.steam.totalPlaytimeMinutes !== undefined
+          ? `${new Intl.NumberFormat("pt-BR", {
+              maximumFractionDigits: 1,
+            }).format(data.steam.totalPlaytimeMinutes / 60)} h no total`
+          : undefined,
+      ]
+        .filter(Boolean)
+        .join(" · "),
       status:
         data.steam.isPlaying && !stale
           ? "Jogando agora"
           : "Jogado recentemente",
       image: data.steam.imageUrl,
+      cover: data.steam.coverUrl,
       url: data.steam.externalUrl,
       observedAt: data.steam.observedAt,
     };
@@ -104,6 +116,7 @@ function details(
 }
 function displayTime(value: string) {
   return new Date(value).toLocaleString("pt-BR", {
+    timeZone: "America/Sao_Paulo",
     day: "2-digit",
     month: "2-digit",
     hour: "2-digit",
@@ -341,6 +354,18 @@ export function LiveActivitySection() {
                 className="live-card-reveal"
               >
                 <article className={`live-card live-${provider}`}>
+                  {provider === "steam" && info.cover && (
+                    <div className="live-card-cover" aria-hidden="true">
+                      <Image
+                        src={info.cover}
+                        alt=""
+                        fill
+                        sizes="(max-width: 700px) 100vw, 50vw"
+                        loading="lazy"
+                        referrerPolicy="no-referrer"
+                      />
+                    </div>
+                  )}
                   <div className="live-card-heading">
                     <span aria-hidden="true" className="live-symbol">
                       {labels[provider].symbol}
