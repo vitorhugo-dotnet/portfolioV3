@@ -1,9 +1,9 @@
 import type { MetadataRoute } from "next";
-import { sitemapOrigin } from "../lib/site-config";
+import { canonicalOrigin } from "../lib/site-config.ts";
 export const dynamic = "force-static";
 export default function robots(): MetadataRoute.Robots {
   return {
     rules: { userAgent: "*", allow: "/" },
-    sitemap: `${sitemapOrigin}/sitemap.xml`,
+    sitemap: `${canonicalOrigin}/sitemap.xml`,
   };
 }
