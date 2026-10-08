@@ -15,6 +15,7 @@ on:
         options: [preview, production]
   schedule:
     - cron: '0 6 * * *'
+      timezone: "America/Sao_Paulo"
 
 permissions:
   contents: read
