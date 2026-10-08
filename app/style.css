@@ -481,6 +481,84 @@ h2 {
   border-top: 1px solid var(--line);
   border-left: 1px solid var(--line);
 }
+.reading-shelves {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+.reading-shelf {
+  min-width: 0;
+  padding: 22px;
+  border: 1px solid var(--line);
+  background: #11171d;
+}
+.reading-shelf h3 {
+  min-height: 2.5em;
+  margin: 0 0 18px;
+  color: var(--ink);
+  font:
+    500 17px "Space Grotesk",
+    sans-serif;
+}
+.reading-book-list {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.reading-book {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  color: var(--ink);
+  text-decoration: none;
+}
+.reading-book-cover {
+  display: grid;
+  width: 56px;
+  height: 78px;
+  overflow: hidden;
+  place-items: center;
+  border: 1px solid var(--line);
+  background: #1a222b;
+}
+.reading-book-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.reading-cover-fallback {
+  color: var(--red);
+  font-size: 24px;
+}
+.reading-book-copy {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+.reading-book-copy strong {
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.reading-book-copy > span {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+.reading-book-link {
+  align-self: start;
+  color: var(--red);
+  font-size: 12px;
+}
+.reading-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
 .study {
   padding: 30px;
   border-right: 1px solid var(--line);
@@ -914,6 +992,12 @@ footer > a:last-child {
   }
   .studies {
     grid-template-columns: 1fr;
+  }
+  .reading-shelves {
+    grid-template-columns: 1fr;
+  }
+  .reading-shelf h3 {
+    min-height: 0;
   }
   .study {
     padding: 25px;

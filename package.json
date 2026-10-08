@@ -2,7 +2,7 @@
   "name": "hugo-code-dojo",
   "private": true,
   "scripts": {
-    "build": "npm run sync:repos && next build",
+    "build": "npm run sync:repos && npm run sync:reading-log && next build",
     "dev": "next dev",
     "typecheck": "tsc --noEmit",
     "format": "biome format --write .",
@@ -13,11 +13,13 @@
     "ci": "biome ci .",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
     "sync:repos": "node --experimental-strip-types scripts/sync-repositories.ts",
+    "sync:reading-log": "node --experimental-strip-types scripts/sync-reading-log.ts",
     "typecheck:worker": "tsc --noEmit -p worker/tsconfig.json",
     "worker:dev": "wrangler dev --config worker/wrangler.jsonc",
     "worker:check": "wrangler deploy --config worker/wrangler.jsonc --env preview --dry-run && wrangler deploy --config worker/wrangler.jsonc --env production --dry-run"
   },
   "dependencies": {
+    "goodreads-bookshelf-api": "^1.0.2",
     "motion": "^14.0.0",
     "next": "^16.4.0",
     "react": "^19.2.0",

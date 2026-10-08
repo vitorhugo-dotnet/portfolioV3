@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { AnchorHTMLAttributes, ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { LiveActivitySection } from "../components/live-activity";
+import { ReadingLogSection } from "../components/reading-log";
 import {
   DepthLayer,
   HeroScene,
@@ -309,6 +310,7 @@ export default function Page() {
             ["laboratorio", "Laboratório"],
             ["atividade", "Atividade"],
             ["agora", "Agora"],
+            ["leitura", "Leitura"],
             ["sobre", "Além do código"],
           ].map(([id, label]) => (
             <a
@@ -730,8 +732,9 @@ export default function Page() {
           </p>
         </Chapter>
         <LiveActivitySection />
+        <ReadingLogSection />
         <section className="about" id="sobre">
-          <div className="about-number">07 / ALÉM DO CÓDIGO</div>
+          <div className="about-number">08 / ALÉM DO CÓDIGO</div>
           <Reveal className="about-title">
             <span lang="ja">探求</span>
             <h2>
@@ -757,7 +760,7 @@ export default function Page() {
         </section>
         <section className="contact" id="contato">
           <Reveal>
-            <span className="tag">08 / PRÓXIMO CAPÍTULO</span>
+            <span className="tag">09 / PRÓXIMO CAPÍTULO</span>
           </Reveal>
           <h2>
             Vamos construir
