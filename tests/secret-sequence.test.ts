@@ -20,7 +20,7 @@ test("unlocks after six alternating arrows", () => {
 });
 
 test("slow keypresses reset the sequence", () => {
-  let state = advanceSecretSequence(
+  const state = advanceSecretSequence(
     INITIAL_SECRET_SEQUENCE_STATE,
     "ArrowUp",
     1000,

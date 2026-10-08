@@ -23,7 +23,6 @@ import { linkedInProfileForHostname } from "../lib/site-config.ts";
 import { LanguageSwitcher } from "./language-switcher";
 import { LiveActivitySection } from "./live-activity";
 import { ReadingLogSection } from "./reading-log";
-import { SecretTerminalController } from "./secret-terminal-controller";
 import {
   DepthLayer,
   HeroScene,
@@ -33,6 +32,7 @@ import {
   TechnologyBadges,
   useActiveSection,
 } from "./scroll-motion";
+import { SecretTerminalController } from "./secret-terminal-controller";
 
 type StudyLanguage = "Java" | "C#";
 type StudyFilter = "all" | StudyLanguage;

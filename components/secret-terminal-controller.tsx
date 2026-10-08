@@ -10,9 +10,21 @@ import {
 } from "../lib/secret-sequence.ts";
 import styles from "./secret-terminal.module.css";
 
-const SecretTerminalOverlay = dynamic(() => import("./secret-terminal-overlay"), {
-  ssr: false,
-});
+const SecretTerminalOverlay = dynamic(
+  () => import("./secret-terminal-overlay"),
+  {
+    ssr: false,
+  },
+);
+
+const HINT_KEYS = [
+  { id: "up-one", arrow: "↑" },
+  { id: "down-one", arrow: "↓" },
+  { id: "up-two", arrow: "↑" },
+  { id: "down-two", arrow: "↓" },
+  { id: "up-three", arrow: "↑" },
+  { id: "down-three", arrow: "↓" },
+] as const;
 
 type HintPosition = { top: number; left: number };
 
@@ -112,8 +124,8 @@ export function SecretTerminalController({
               : "Secret hint: up arrow then down arrow, three times"
           }
         >
-          {["↑", "↓", "↑", "↓", "↑", "↓"].map((arrow, index) => (
-            <span className={styles.hintKey} key={index}>
+          {HINT_KEYS.map(({ arrow, id }) => (
+            <span className={styles.hintKey} key={id}>
               {arrow}
             </span>
           ))}

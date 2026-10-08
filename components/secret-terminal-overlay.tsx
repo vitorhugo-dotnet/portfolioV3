@@ -56,9 +56,7 @@ export default function SecretTerminalOverlay({
       className={styles.overlay}
       role="dialog"
       aria-modal="true"
-      aria-label={
-        isPortuguese ? "Terminal secreto" : "Secret terminal"
-      }
+      aria-label={isPortuguese ? "Terminal secreto" : "Secret terminal"}
     >
       {!showTerminal && (
         <div className={styles.glitch} role="status" aria-live="polite">
@@ -81,7 +79,9 @@ export default function SecretTerminalOverlay({
           <iframe
             className={styles.frame}
             src={TERMINAL_URL}
-            title={isPortuguese ? "Jogo no terminal retro" : "Retro terminal game"}
+            title={
+              isPortuguese ? "Jogo no terminal retro" : "Retro terminal game"
+            }
             loading="eager"
             referrerPolicy="strict-origin-when-cross-origin"
             sandbox="allow-scripts allow-same-origin allow-forms allow-pointer-lock"
