@@ -48,3 +48,33 @@ export function advanceSecretSequence(
     unlocked: false,
   };
 }
+
+export const MOBILE_LOGO_CLICKS = 6;
+export const MAX_MOBILE_LOGO_GAP_MS = 3000;
+
+export type MobileLogoSequenceState = {
+  count: number;
+  lastClickedAt: number | null;
+};
+
+export const INITIAL_MOBILE_LOGO_SEQUENCE_STATE: MobileLogoSequenceState = {
+  count: 0,
+  lastClickedAt: null,
+};
+
+export function advanceMobileLogoSequence(
+  state: MobileLogoSequenceState,
+  clickedAt: number,
+): { state: MobileLogoSequenceState; unlocked: boolean } {
+  const isContinuation =
+    state.lastClickedAt !== null &&
+    clickedAt >= state.lastClickedAt &&
+    clickedAt - state.lastClickedAt <= MAX_MOBILE_LOGO_GAP_MS;
+  const count = isContinuation ? state.count + 1 : 1;
+
+  if (count === MOBILE_LOGO_CLICKS) {
+    return { state: INITIAL_MOBILE_LOGO_SEQUENCE_STATE, unlocked: true };
+  }
+
+  return { state: { count, lastClickedAt: clickedAt }, unlocked: false };
+}
