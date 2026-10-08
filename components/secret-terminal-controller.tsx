@@ -32,10 +32,8 @@ const HINT_KEYS = [
 
 type HintPosition = { top: number; left: number };
 type SecretGame = "desktop" | "mobile";
-type Hint = HintPosition & (
-  | { mode: "keyboard" }
-  | { mode: "touch"; count: number }
-);
+type Hint = HintPosition &
+  ({ mode: "keyboard" } | { mode: "touch"; count: number });
 
 export function SecretTerminalController({
   locale,
@@ -158,8 +156,8 @@ export function SecretTerminalController({
           aria-label={
             hint.mode === "touch"
               ? locale === "pt-BR"
-                ? "Toque na logo mais " + (MOBILE_LOGO_CLICKS - hint.count) + " vezes para abrir o jogo"
-                : "Tap the logo " + (MOBILE_LOGO_CLICKS - hint.count) + " more times to open the game"
+                ? `Toque na logo mais ${MOBILE_LOGO_CLICKS - hint.count} vezes para abrir o jogo`
+                : `Tap the logo ${MOBILE_LOGO_CLICKS - hint.count} more times to open the game`
               : locale === "pt-BR"
                 ? "Pista secreta: seta para cima e para baixo, três vezes"
                 : "Secret hint: up arrow then down arrow, three times"
