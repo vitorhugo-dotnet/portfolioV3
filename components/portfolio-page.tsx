@@ -23,6 +23,7 @@ import { linkedInProfileForHostname } from "../lib/site-config.ts";
 import { LanguageSwitcher } from "./language-switcher";
 import { LiveActivitySection } from "./live-activity";
 import { ReadingLogSection } from "./reading-log";
+import { SecretTerminalController } from "./secret-terminal-controller";
 import {
   DepthLayer,
   HeroScene,
@@ -240,6 +241,7 @@ export function PortfolioPage({ locale }: { locale: Locale }) {
   return (
     <ScrollExperience preference={motion}>
       <ScrollProgress />
+      <SecretTerminalController locale={locale} motion={motion} />
       <a className="skip" href="#sobre">
         {t("skip.professional")}
       </a>
