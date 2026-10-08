@@ -26,7 +26,7 @@ class FakeElement {
 
   querySelector(selector: string): FakeElement | null {
     const value = this.children[selector];
-    return Array.isArray(value) ? value[0] ?? null : value ?? null;
+    return Array.isArray(value) ? (value[0] ?? null) : (value ?? null);
   }
 
   querySelectorAll(selector: string): FakeElement[] {
@@ -113,9 +113,13 @@ test("uses only rendered content and allowlisted section IDs", () => {
   const professional = new FakeElement("I'm a developer.", {
     h2: new FakeElement("About me"),
     "a[href]": [
-      new FakeElement("My GitHub", {}, {
-        href: "https://github.com/vitorhugo-dotnet",
-      }),
+      new FakeElement(
+        "My GitHub",
+        {},
+        {
+          href: "https://github.com/vitorhugo-dotnet",
+        },
+      ),
       new FakeElement("Unsafe", {}, { href: "javascript:alert(1)" }),
     ],
   });
@@ -133,10 +137,19 @@ test("uses only rendered content and allowlisted section IDs", () => {
     return tool.execute(input) as Record<string, unknown>;
   };
   const listed = invoke("portfolio_list_sections").sections as { id: string }[];
-  assert.deepEqual(listed.map((section) => section.id), ["sobre", "alem-do-codigo"]);
+  assert.deepEqual(
+    listed.map((section) => section.id),
+    ["sobre", "alem-do-codigo"],
+  );
   const about = invoke("portfolio_get_about");
-  assert.equal((about.professional as { text: string }).text, "I'm a developer.");
-  assert.equal((about.personal as { text: string }).text, "Games and astronomy");
+  assert.equal(
+    (about.professional as { text: string }).text,
+    "I'm a developer.",
+  );
+  assert.equal(
+    (about.personal as { text: string }).text,
+    "Games and astronomy",
+  );
   assert.deepEqual((about.professional as { links: unknown[] }).links, [
     { label: "My GitHub", url: "https://github.com/vitorhugo-dotnet" },
   ]);
@@ -148,19 +161,27 @@ test("uses only rendered content and allowlisted section IDs", () => {
   });
   professional.innerText = "The on-screen content changed";
   assert.equal(
-    (invoke("portfolio_get_section", { section: "sobre" }).section as { text: string }).text,
+    (
+      invoke("portfolio_get_section", { section: "sobre" }).section as {
+        text: string;
+      }
+    ).text,
     "The on-screen content changed",
   );
 });
 
 test("reading reflects empty shelves and structured visible books", () => {
-  const book = new FakeElement("Book", {
-    strong: new FakeElement("The Stranger"),
-    ".reading-book-copy > span": [
-      new FakeElement("Camus"),
-      new FakeElement("Finished today"),
-    ],
-  }, { href: "https://www.goodreads.com/book/show/1" });
+  const book = new FakeElement(
+    "Book",
+    {
+      strong: new FakeElement("The Stranger"),
+      ".reading-book-copy > span": [
+        new FakeElement("Camus"),
+        new FakeElement("Finished today"),
+      ],
+    },
+    { href: "https://www.goodreads.com/book/show/1" },
+  );
   const reading = new FakeElement("Reading", {
     h2: new FakeElement("Reading log"),
     ".reading-shelf": [
@@ -174,9 +195,9 @@ test("reading reflects empty shelves and structured visible books", () => {
       }),
     ],
   });
-  const tool = createPortfolioWebMCPTools(makeDocument({ leitura: reading })).find(
-    ({ name }) => name === "portfolio_get_reading",
-  );
+  const tool = createPortfolioWebMCPTools(
+    makeDocument({ leitura: reading }),
+  ).find(({ name }) => name === "portfolio_get_reading");
   assert.ok(tool);
   const result = tool.execute() as {
     shelves: Array<{ books: unknown[]; emptyMessage: string | null }>;
@@ -202,16 +223,23 @@ test("now reads the latest UI state without inventing activity", () => {
     ".live-card": activities,
   });
   const doc = makeDocument({ agora: now });
-  const tool = createPortfolioWebMCPTools(doc).find(({ name }) => name === "portfolio_get_now");
+  const tool = createPortfolioWebMCPTools(doc).find(
+    ({ name }) => name === "portfolio_get_now",
+  );
   assert.ok(tool);
-  assert.deepEqual((tool.execute() as { activities: unknown[] }).activities, []);
+  assert.deepEqual(
+    (tool.execute() as { activities: unknown[] }).activities,
+    [],
+  );
   status.innerText = "Updated at 23:00";
-  activities.push(new FakeElement("Spotify", {
-    ".live-provider": new FakeElement("Spotify"),
-    ".live-status": new FakeElement("Now listening"),
-    h3: new FakeElement("Track title"),
-    time: new FakeElement("", {}, { datetime: "2026-10-08T02:00:00Z" }),
-  }));
+  activities.push(
+    new FakeElement("Spotify", {
+      ".live-provider": new FakeElement("Spotify"),
+      ".live-status": new FakeElement("Now listening"),
+      h3: new FakeElement("Track title"),
+      time: new FakeElement("", {}, { datetime: "2026-10-08T02:00:00Z" }),
+    }),
+  );
   const result = tool.execute() as {
     status: string;
     activities: Array<{ provider: string; title: string }>;

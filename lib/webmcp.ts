@@ -32,7 +32,7 @@ type ModelContext = {
   registerTool: (
     tool: PortfolioTool,
     options: { signal: AbortSignal },
-  ) => void | Promise<unknown>;
+  ) => undefined | Promise<unknown>;
 };
 
 type WebMCPDocument = Document & { modelContext?: ModelContext };
@@ -40,7 +40,7 @@ type WebMCPDocument = Document & { modelContext?: ModelContext };
 function visibleText(element: Element | null): string {
   if (!element) return "";
   const rendered = (element as HTMLElement).innerText;
-  return (typeof rendered === "string" ? rendered : element.textContent ?? "")
+  return (typeof rendered === "string" ? rendered : (element.textContent ?? ""))
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -68,10 +68,13 @@ function getSection(doc: Document, id: PortfolioSection) {
   return {
     id,
     title: visibleText(section.querySelector("h2")),
-    url: new URL("#" + id, pageUrl(doc)).href,
+    url: new URL(`#${id}`, pageUrl(doc)).href,
     text: visibleText(section),
     links: Array.from(section.querySelectorAll("a[href]"))
-      .map((anchor) => ({ label: visibleText(anchor), url: safeLink(doc, anchor) }))
+      .map((anchor) => ({
+        label: visibleText(anchor),
+        url: safeLink(doc, anchor),
+      }))
       .filter((link): link is { label: string; url: string } =>
         Boolean(link.url && link.label),
       ),
@@ -87,7 +90,9 @@ function readingDetails(doc: Document) {
           name: visibleText(shelf.querySelector("h3")),
           books: Array.from(shelf.querySelectorAll(".reading-book")).map(
             (book) => {
-              const details = book.querySelectorAll(".reading-book-copy > span");
+              const details = book.querySelectorAll(
+                ".reading-book-copy > span",
+              );
               return {
                 title: visibleText(book.querySelector("strong")),
                 author: visibleText(details[0] ?? null),
@@ -96,7 +101,8 @@ function readingDetails(doc: Document) {
               };
             },
           ),
-          emptyMessage: visibleText(shelf.querySelector(".reading-empty")) || null,
+          emptyMessage:
+            visibleText(shelf.querySelector(".reading-empty")) || null,
         }))
       : [],
   };
@@ -112,12 +118,16 @@ function nowDetails(doc: Document) {
           provider: visibleText(card.querySelector(".live-provider")),
           status: visibleText(card.querySelector(".live-status")),
           title: visibleText(card.querySelector("h3")),
-          details: visibleText(card.querySelector(".live-card-content p")) || null,
-          observedAt: card.querySelector("time")?.getAttribute("datetime") ?? null,
+          details:
+            visibleText(card.querySelector(".live-card-content p")) || null,
+          observedAt:
+            card.querySelector("time")?.getAttribute("datetime") ?? null,
           url: safeLink(doc, card.querySelector("a[href]") ?? card),
         }))
       : [],
-    standby: section ? visibleText(section.querySelector(".live-standby")) || null : null,
+    standby: section
+      ? visibleText(section.querySelector(".live-standby")) || null
+      : null,
   };
 }
 
@@ -141,7 +151,9 @@ export function createPortfolioWebMCPTools(doc: Document): PortfolioTool[] {
         page: pageUrl(doc),
         sections: portfolioSections.flatMap((id) => {
           const section = getSection(doc, id);
-          return section ? [{ id, title: section.title, url: section.url }] : [];
+          return section
+            ? [{ id, title: section.title, url: section.url }]
+            : [];
         }),
       }),
     },
@@ -195,7 +207,9 @@ export function createPortfolioWebMCPTools(doc: Document): PortfolioTool[] {
           typeof id !== "string" ||
           !portfolioSections.includes(id as PortfolioSection)
         ) {
-          return { error: "Unknown portfolio section. Use portfolio_list_sections." };
+          return {
+            error: "Unknown portfolio section. Use portfolio_list_sections.",
+          };
         }
         return { section: getSection(doc, id as PortfolioSection) };
       },
@@ -213,9 +227,9 @@ export function registerPortfolioWebMCP(doc: Document): () => void {
   for (const tool of createPortfolioWebMCPTools(doc)) {
     try {
       // One unsupported tool must not stop registration of the remaining tools.
-      Promise.resolve(context.registerTool(tool, { signal: controller.signal })).catch(
-        () => {},
-      );
+      Promise.resolve(
+        context.registerTool(tool, { signal: controller.signal }),
+      ).catch(() => {});
     } catch {
       // Experimental browser API: keep the portfolio usable if registration fails.
     }
