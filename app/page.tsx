@@ -770,12 +770,11 @@ export default function Page() {
           <External href={gh}>Explorar o GitHub ↗</External>
         </section>
       </main>
-      <footer>
+      <footer className="site-footer">
         <a className="logo" href="#inicio">
           H<span>.</span>
         </a>
         <span>VITOR HUGO · JAVA / C# · FEITO COM CURIOSIDADE</span>
-        <Link href="/hub">HUB / DOCUMENTOS ↗</Link>
         <a href="#inicio">VOLTAR AO TOPO ↑</a>
       </footer>
     </ScrollExperience>
