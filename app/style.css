@@ -267,6 +267,35 @@ h2 {
   line-height: 1.9;
   margin: 25px 0 45px;
 }
+.professional-about h2 {
+  font-size: clamp(34px, 4vw, 52px);
+  letter-spacing: -2px;
+}
+.professional-copy {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(22px, 4vw, 56px);
+  margin-top: 25px;
+}
+.professional-copy > div {
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+}
+.professional-copy p {
+  max-width: 430px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.9;
+}
+.professional-copy strong {
+  color: var(--ink);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: var(--red);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+}
 .products {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -831,6 +860,9 @@ footer > a:last-child {
   .products {
     grid-template-columns: 1fr;
   }
+  .professional-copy {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .product {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -963,6 +995,17 @@ footer > a:last-child {
     letter-spacing: -2px;
   }
   .intro {
+    font-size: 13px;
+  }
+  .professional-about h2 {
+    font-size: 36px;
+    letter-spacing: -1.5px;
+  }
+  .professional-copy {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+  .professional-copy p {
     font-size: 13px;
   }
   .product {

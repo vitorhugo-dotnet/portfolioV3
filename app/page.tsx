@@ -54,6 +54,7 @@ type ChapterProps = {
   title: ReactNode;
   children: ReactNode;
   id: string;
+  className?: string;
 };
 
 type ExternalProps = AnchorHTMLAttributes<HTMLAnchorElement> & {
@@ -110,9 +111,9 @@ const studies = [
     "Gateway e serviços para um fluxo distribuído.",
   ],
 ];
-function Chapter({ n, label, title, children, id }: ChapterProps) {
+function Chapter({ n, label, title, children, id, className }: ChapterProps) {
   return (
-    <section id={id} className="chapter">
+    <section id={id} className={className ? `chapter ${className}` : "chapter"}>
       <div className="section-label">
         <span>
           {n} / {label}
@@ -287,8 +288,8 @@ export default function Page() {
   return (
     <ScrollExperience preference={motion}>
       <ScrollProgress />
-      <a className="skip" href="#produtos">
-        Pular para projetos
+      <a className="skip" href="#sobre">
+        Pular para apresentação profissional
       </a>
       <header>
         <a href="#inicio" className="logo">
@@ -305,13 +306,14 @@ export default function Page() {
         </button>
         <nav className={menu ? "open" : ""}>
           {[
+            ["sobre", "Sobre mim"],
             ["produtos", "Produtos"],
             ["android", "Android"],
             ["laboratorio", "Laboratório"],
             ["atividade", "Atividade"],
             ["agora", "Agora"],
             ["leitura", "Leitura"],
-            ["sobre", "Além do código"],
+            ["alem-do-codigo", "Além do código"],
           ].map(([id, label]) => (
             <a
               key={id}
@@ -387,6 +389,41 @@ export default function Page() {
         </div>
         <Chapter
           n="02"
+          label="SOBRE MIM"
+          id="sobre"
+          className="professional-about"
+          title="Profissional por vocação."
+        >
+          <div className="professional-copy">
+            <Reveal>
+              <p>
+                Sou desenvolvedor Full Stack com mais de 2 anos de experiência,
+                especializado em <strong>Java</strong>,{" "}
+                <strong>Spring Boot</strong>, <strong>C#/.NET</strong> e{" "}
+                <strong>React</strong>.
+              </p>
+            </Reveal>
+            <Reveal delay={0.08}>
+              <p>
+                Atuo no desenvolvimento de sistemas públicos de Saúde e
+                Financeiro, trabalhando com aplicações críticas, APIs,
+                integração de sistemas, otimização de bancos de dados e
+                arquiteturas offline-first.
+              </p>
+            </Reveal>
+            <Reveal delay={0.16}>
+              <p>
+                Além da experiência profissional, desenvolvo produtos próprios e
+                exploro arquiteturas distribuídas, comunicação em tempo real,
+                automações, DevOps e observabilidade. Meu foco é construir
+                soluções eficientes, confiáveis e sustentáveis, da arquitetura à
+                produção.
+              </p>
+            </Reveal>
+          </div>
+        </Chapter>
+        <Chapter
+          n="03"
           label="PRODUTOS & PLATAFORMAS"
           id="produtos"
           title={
@@ -500,7 +537,7 @@ export default function Page() {
           </div>
         </Chapter>
         <Chapter
-          n="03"
+          n="04"
           label="ANDROID APPS"
           id="android"
           title={
@@ -566,7 +603,7 @@ export default function Page() {
           </div>
         </Chapter>
         <Chapter
-          n="04"
+          n="05"
           label="LABORATÓRIO"
           id="laboratorio"
           title={
@@ -642,7 +679,7 @@ export default function Page() {
           </details>
         </Chapter>
         <Chapter
-          n="05"
+          n="06"
           label="GITHUB ACTIVITY"
           id="atividade"
           title={
@@ -733,8 +770,8 @@ export default function Page() {
         </Chapter>
         <LiveActivitySection />
         <ReadingLogSection />
-        <section className="about" id="sobre">
-          <div className="about-number">08 / ALÉM DO CÓDIGO</div>
+        <section className="about" id="alem-do-codigo">
+          <div className="about-number">09 / ALÉM DO CÓDIGO</div>
           <Reveal className="about-title">
             <span lang="ja">探求</span>
             <h2>
@@ -760,7 +797,7 @@ export default function Page() {
         </section>
         <section className="contact" id="contato">
           <Reveal>
-            <span className="tag">09 / PRÓXIMO CAPÍTULO</span>
+            <span className="tag">10 / PRÓXIMO CAPÍTULO</span>
           </Reveal>
           <h2>
             Vamos construir

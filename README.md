@@ -1,6 +1,6 @@
 # Hugo — Code Dojo
 
-Vitor Hugo's portfolio uses Next.js App Router, React, TypeScript and static export. The Japanese landscape, product cards, Android mockup, laboratory filters, repository search and GitHub activity keep the original visual identity.
+Vitor Hugo's portfolio uses Next.js App Router, React, TypeScript and static export. A concise professional introduction now follows the Hero, while the personal “Além do código” section, Japanese landscape, product cards, Android mockup, laboratory filters, repository search and GitHub activity keep the original visual identity.
 
 ## Local development
 
@@ -66,7 +66,7 @@ Actual deployments require these settings and account access. Tests and dry-runs
 
 ## Live activity
 
-Section **06 — “O que estou fazendo agora?”** follows the GitHub timeline with WakaTime, Spotify, Simkl and Steam cards. The GitHub timeline remains section 05, “Além do código” is 07 and contact is 08. The frontend polls only the public Worker endpoint while the section and tab are visible, at 60-second intervals without overlapping requests. It shows skeletons, empty/disconnected/unavailable provider states, update time and a stale-data indicator after two minutes.
+Section **07 — “O que estou fazendo agora?”** follows the GitHub timeline with WakaTime, Spotify, Simkl and Steam cards. The professional introduction is section 02, the GitHub timeline remains section 06, the Goodreads reading log is 08, “Além do código” is 09 and contact is 10. The frontend polls only the public Worker endpoint while the section and tab are visible, at 60-second intervals without overlapping requests. It shows skeletons, empty/disconnected/unavailable provider states, update time and a stale-data indicator after two minutes.
 
 `worker/src/index.ts` serves `GET /api/activity`; each adapter returns only normalized public activity. The Cache API stores that DTO for 60 seconds per Worker origin. Query strings do not create new cache entries. CORS is applied separately for each response, allowing the two portfolio domains and this project's Pages/preview domains. Localhost is allowed only for local development. CORS is not authentication; all returned activity is intentionally public.
 

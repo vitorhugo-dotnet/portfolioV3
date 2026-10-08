@@ -305,7 +305,7 @@ export function LiveActivitySection() {
   return (
     <section ref={section} id="agora" className="chapter live-activity">
       <div className="section-label">
-        <span>06 / AGORA</span>
+        <span>07 / AGORA</span>
         <span>HUGO.DEV ↙</span>
       </div>
       <Reveal>

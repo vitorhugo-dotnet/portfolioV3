@@ -60,7 +60,7 @@ export function ReadingLogSection() {
     <section id="leitura" className="chapter reading-log">
       <div className="section-label">
         <span>
-          07 / <span lang="ja">読書</span>
+          08 / <span lang="ja">読書</span>
         </span>
         <span>HUGO.DEV ↙</span>
       </div>
