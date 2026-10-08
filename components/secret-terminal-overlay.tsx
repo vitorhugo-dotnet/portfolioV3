@@ -5,21 +5,26 @@ import { createPortal } from "react-dom";
 import type { Locale } from "../i18n/config.ts";
 import styles from "./secret-terminal.module.css";
 
-const TERMINAL_URL = "https://holy-violet-c21b.hugoalves-java.workers.dev/";
+const DESKTOP_GAME_URL = "https://holy-violet-c21b.hugoalves-java.workers.dev/";
+const MOBILE_GAME_URL = "https://icy-snow-6925.hugoalves-java.workers.dev/";
 
 export default function SecretTerminalOverlay({
   locale,
   motion,
+  game,
   onClose,
 }: {
   locale: Locale;
   motion: boolean;
+  game: "desktop" | "mobile";
   onClose: () => void;
 }) {
   const [showTerminal, setShowTerminal] = useState(false);
   const [loading, setLoading] = useState(true);
   const closeRef = useRef<HTMLButtonElement>(null);
   const isPortuguese = locale === "pt-BR";
+  const isMobileGame = game === "mobile";
+  const gameUrl = isMobileGame ? MOBILE_GAME_URL : DESKTOP_GAME_URL;
 
   useEffect(() => {
     const previouslyFocused = document.activeElement;
@@ -56,7 +61,15 @@ export default function SecretTerminalOverlay({
       className={styles.overlay}
       role="dialog"
       aria-modal="true"
-      aria-label={isPortuguese ? "Terminal secreto" : "Secret terminal"}
+      aria-label={
+        isMobileGame
+          ? isPortuguese
+            ? "Arcade secreto"
+            : "Secret arcade"
+          : isPortuguese
+            ? "Terminal secreto"
+            : "Secret terminal"
+      }
     >
       {!showTerminal && (
         <div className={styles.glitch} role="status" aria-live="polite">
@@ -72,27 +85,39 @@ export default function SecretTerminalOverlay({
           {loading && (
             <div className={styles.loading} role="status">
               {isPortuguese
-                ? "Conectando ao terminal externo..."
-                : "Connecting to external terminal..."}
+                ? "Conectando ao jogo secreto..."
+                : "Connecting to the secret game..."}
             </div>
           )}
           <iframe
             className={styles.frame}
-            src={TERMINAL_URL}
+            src={gameUrl}
             title={
-              isPortuguese ? "Jogo no terminal retro" : "Retro terminal game"
+              isMobileGame
+                ? isPortuguese
+                  ? "Jogo secreto para celular"
+                  : "Secret mobile game"
+                : isPortuguese
+                  ? "Jogo no terminal retrô"
+                  : "Retro terminal game"
             }
             loading="eager"
-            referrerPolicy="strict-origin-when-cross-origin"
+            referrerPolicy="no-referrer"
             sandbox="allow-scripts allow-same-origin allow-forms allow-pointer-lock"
             allow="autoplay; fullscreen"
             allowFullScreen
             onLoad={() => setLoading(false)}
           />
           <div className={styles.credit}>
-            <span>Terminal by Remo H. Jansen</span>
+            <span>
+              {isMobileGame
+                ? isPortuguese
+                  ? "Arcade secreto • Mobile"
+                  : "Secret Arcade • Mobile"
+                : "Terminal by Remo H. Jansen"}
+            </span>
             <a
-              href={TERMINAL_URL}
+              href={gameUrl}
               target="_blank"
               rel="noopener noreferrer"
               title={
