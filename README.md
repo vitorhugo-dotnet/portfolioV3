@@ -11,6 +11,18 @@ npm ci
 npm run dev
 ```
 
+## Languages and translations
+
+The portfolio is available in Brazilian Portuguese (`pt-BR`) at `/` and English (`en`) at `/en`. Portuguese is the default. The URL is the source of truth for the active language; there is no automatic language detection, redirect, or saved locale. The header selector uses ordinary Next.js links and preserves a current section hash when switching between the two homepages.
+
+The locale-specific route wrappers share `components/portfolio-page.tsx` and the same underlying activity integrations. English is rendered as static HTML at build time, just like Portuguese. The Portuguese route group supplies `lang="pt-BR"`; `/en` has its own layout with `lang="en"`.
+
+Presentation copy lives in `i18n/dictionaries/pt-BR.ts` and `i18n/dictionaries/en.ts`. `i18n/dictionaries/pt-BR.ts` defines the translation key shape and the English dictionary must satisfy it, so mismatched keys fail TypeScript validation. Components call `translate(locale, key, values)` for plain, interpolated, and pluralized messages. Locale-aware date, number, duration and relative-time helpers are in `i18n/format.ts`. Integration payload values and identifiers remain language-neutral; translated labels are applied at presentation time.
+
+To add a message, add the same key to both dictionaries, then use its typed key in the component. To add another language, add its locale and dictionary, extend the route and metadata mapping, and include it in the sitemap alternates and switcher. Localized metadata is built through `localizedHomepageMetadata`: each homepage gets its own canonical, title, description, Open Graph locale and reciprocal `hreflang` links (`pt-BR`, `en`, and `x-default`). `app/sitemap.ts` creates the primary multilingual sitemap with Next.js `MetadataRoute.Sitemap`; `app/robots.ts` allows public paths and points crawlers to it. The existing host-specific sitemap set remains available through `/sitemap-index.xml`.
+
+Static export remains enabled for Cloudflare Pages. No middleware, request-time locale detection, SSR, or i18n package is involved. Build output includes `out/index.html`, `out/en.html`, `out/sitemap.xml` and `out/robots.txt`. `scripts/verify-static-export.ts out` checks these generated files, locale metadata, sitemap alternates and public routes; CI runs the same verifier after the build.
+
 ## Quality and production
 
 ```bash
@@ -29,6 +41,7 @@ npm run build
 | URL | Exported HTML |
 | --- | --- |
 | `/` | `out/index.html` |
+| `/en` | `out/en.html` |
 | `/hub` | `out/hub.html` |
 | `/sonicrelay/privacy-policy` | `out/sonicrelay/privacy-policy.html` |
 | `/the-universe-decides/privacy-policy` | `out/the-universe-decides/privacy-policy.html` |
@@ -169,19 +182,20 @@ The original GPT Sites deployment was https://hugo-code-dojo.ikkiartz.chatgpt.si
 
 `public/favicon.svg` is the supplied H logo, preserved unchanged. `public/hugo-preview.png` is a 1200×630 PNG rendering of the SVG with portfolio branding; PNG works with social crawlers that do not support SVG preview images. Open Graph and Twitter metadata use this shared image on every public page, with each document's own title/description.
 
-The same static artifact serves `hugojava.dev` and `hugodotnet.dev`. There is no fixed canonical or `og:url` that replaces the address being shared with the other domain. The preview image is hosted at `https://hugojava.dev/hugo-preview.png` and reused by both domains. Actual metadata cannot vary with the request hostname in a static export; this setup preserves the requested link's identity without introducing an edge runtime. Social services may cache an earlier card until they recrawl it.
+The static artifact serves `hugojava.dev` and `hugodotnet.dev`, with `hugodotnet.dev` as the canonical search identity. The Portuguese homepage canonical is `https://hugodotnet.dev/`; the English homepage canonical is `https://hugodotnet.dev/en`. Both include reciprocal language alternatives. Other host-specific documents retain their own metadata. The preview image is hosted at `https://hugojava.dev/hugo-preview.png` and reused by both domains. Social services may cache an earlier card until they recrawl it.
 
 `npm run build` first runs `npm run sync:repos`, which retrieves all pages of the public GitHub repository catalog, including each repository's **About → Website** field. Successful results refresh `public/repos.json` for that build. If GitHub is unavailable, rate-limits the request or returns an incomplete catalog, the committed snapshot is retained and the build reports a warning. Snapshot entries may optionally contain `homepage` and `description` fields for offline builds. No GitHub token is required. README links are not scanned automatically.
 
 The Hub lists websites under `hugojava.dev`, `hugodotnet.dev` and their subdomains under **Project websites**. Other public HTTP(S) websites appear in **Outros**, at the end of the Hub; unsafe schemes are rejected. The repository search continues to use the same catalog.
 
-The sitemap is generated during each static build:
+The sitemap files are generated during each static build:
 
-- `/sitemap.xml`: index of the generated host-specific files.
+- `/sitemap.xml`: primary multilingual sitemap for `hugodotnet.dev`, including `/`, `/en`, other public routes and reciprocal `pt-BR`, `en`, and `x-default` homepage alternates.
+- `/sitemap-index.xml`: index of the generated host-specific files retained for the existing cross-domain and discovered-subdomain sitemap set.
 - `/sites/sitemap/hugojava.dev.xml` and `/sites/sitemap/hugodotnet.dev.xml`: all published portfolio routes on their respective domain, plus matching Website URLs.
 - `/sites/sitemap/<subdomain>.xml`: Website URLs for each matching subdomain discovered in the catalog.
-- `/robots.txt`: `User-Agent: *`, `Allow: /`, with the shared sitemap index URL. No crawler is blocked.
+- `/robots.txt`: `User-Agent: *`, `Allow: /`, with `https://hugodotnet.dev/sitemap.xml`. No crawler is blocked.
 
-Each child sitemap contains URLs for a single host. External websites never enter these sitemaps. The shared sitemap index and files are hosted on `hugojava.dev`; **verify ownership of both domains (including their subdomains) in Google Search Console and submit the index there to authorize cross-site sitemap submission**. Publishing a sitemap does not guarantee that a search engine indexes a URL. No arbitrary GitHub Website value can add a third-party host to the index.
+Each child sitemap contains URLs for a single host. External websites never enter these sitemaps. The host-specific sitemap index and files are hosted on `hugojava.dev`; **verify ownership of both domains (including their subdomains) in Google Search Console and submit the index there to authorize cross-site sitemap submission**. The canonical-domain sitemap is at `https://hugodotnet.dev/sitemap.xml`. Publishing a sitemap does not guarantee that a search engine indexes a URL. No arbitrary GitHub Website value can add a third-party host to the index.
 
 New static App Router pages are discovered automatically; private directories, parallel slots and dynamic route templates are excluded because their concrete URLs cannot be inferred from file names. GitHub Actions also rebuilds daily at 03:00 America/Sao_Paulo (06:00 UTC), refreshing Website links without a source change. Everything remains static in `out/`; no request-time backend or additional dependency is required.

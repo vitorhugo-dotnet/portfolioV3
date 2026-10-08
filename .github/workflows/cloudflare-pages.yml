@@ -75,14 +75,16 @@ jobs:
       - name: Verify static routes
         run: |
           test -d out/_next
-          for route in index hub sonicrelay/privacy-policy the-universe-decides/privacy-policy; do
+          for route in index en hub sonicrelay/privacy-policy the-universe-decides/privacy-policy; do
             test -s "out/$route.html"
           done
           test -s out/404.html
           test -s out/sitemap.xml
+          test -s out/sitemap-index.xml
           test -s out/robots.txt
           test -s out/favicon.svg
           test -s out/hugo-preview.png
+          node --experimental-strip-types scripts/verify-static-export.ts out
       - uses: actions/upload-artifact@v7
         with:
           name: portfolio-static-${{ github.sha }}
