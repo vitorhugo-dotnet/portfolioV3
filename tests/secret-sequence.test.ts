@@ -1,9 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  advanceMobileLogoSequence,
   advanceSecretSequence,
+  INITIAL_MOBILE_LOGO_SEQUENCE_STATE,
   INITIAL_SECRET_SEQUENCE_STATE,
+  MAX_MOBILE_LOGO_GAP_MS,
   MAX_SECRET_KEY_GAP_MS,
+  MOBILE_LOGO_CLICKS,
   SECRET_KEYS,
 } from "../lib/secret-sequence.ts";
 
@@ -53,4 +57,37 @@ test("a new ArrowUp restarts the sequence after a mismatch", () => {
   );
   const restarted = advanceSecretSequence(started.state, "ArrowUp", 1100);
   assert.equal(restarted.state.position, 1);
+});
+
+test("six mobile logo taps unlock and reset the counter", () => {
+  let state = INITIAL_MOBILE_LOGO_SEQUENCE_STATE;
+  for (let count = 1; count <= MOBILE_LOGO_CLICKS; count++) {
+    const result = advanceMobileLogoSequence(state, 1000 + count * 150);
+    assert.equal(result.unlocked, count === MOBILE_LOGO_CLICKS);
+    state = result.state;
+  }
+  assert.deepEqual(state, INITIAL_MOBILE_LOGO_SEQUENCE_STATE);
+});
+
+test("mobile logo tap timeout restarts at the first tap", () => {
+  const first = advanceMobileLogoSequence(
+    INITIAL_MOBILE_LOGO_SEQUENCE_STATE,
+    1000,
+  );
+  const afterPause = advanceMobileLogoSequence(
+    first.state,
+    1000 + MAX_MOBILE_LOGO_GAP_MS + 1,
+  );
+  assert.equal(afterPause.unlocked, false);
+  assert.equal(afterPause.state.count, 1);
+});
+
+test("mobile logo taps never unlock before the sixth tap", () => {
+  let state = INITIAL_MOBILE_LOGO_SEQUENCE_STATE;
+  for (let count = 1; count < MOBILE_LOGO_CLICKS; count++) {
+    const result = advanceMobileLogoSequence(state, count * 100);
+    assert.equal(result.unlocked, false);
+    assert.equal(result.state.count, count);
+    state = result.state;
+  }
 });
