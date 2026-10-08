@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import type { Locale } from "../i18n/config.ts";
 import styles from "./secret-terminal.module.css";
 
-const TERMINAL_URL = "https://www.remojansen.com/";
+const TERMINAL_URL = "https://holy-violet-c21b.hugoalves-java.workers.dev/";
 
 export default function SecretTerminalOverlay({
   locale,
@@ -97,8 +97,8 @@ export default function SecretTerminalOverlay({
               rel="noopener noreferrer"
               title={
                 isPortuguese
-                  ? "Se o site bloquear o iframe, abrir a versão original"
-                  : "If the website blocks embedding, open the original"
+                  ? "Se o iframe não carregar, abrir a versão hospedada"
+                  : "If the iframe fails, open the hosted version"
               }
             >
               {isPortuguese ? "Não carregou? ↗" : "Not loading? ↗"}
