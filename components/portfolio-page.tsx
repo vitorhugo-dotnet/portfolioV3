@@ -22,6 +22,7 @@ import {
 import { linkedInProfileForHostname } from "../lib/site-config.ts";
 import { LanguageSwitcher } from "./language-switcher";
 import { LiveActivitySection } from "./live-activity";
+import { ReadingLogSection } from "./reading-log";
 import {
   DepthLayer,
   HeroScene,
@@ -59,6 +60,7 @@ type ChapterProps = {
   title: ReactNode;
   children: ReactNode;
   id: string;
+  className?: string;
 };
 
 type ExternalProps = AnchorHTMLAttributes<HTMLAnchorElement> & {
@@ -84,9 +86,9 @@ function useTranslation(locale: Locale) {
   );
 }
 
-function Chapter({ n, label, title, children, id }: ChapterProps) {
+function Chapter({ n, label, title, children, id, className }: ChapterProps) {
   return (
-    <section id={id} className="chapter">
+    <section id={id} className={className ? `chapter ${className}` : "chapter"}>
       <div className="section-label">
         <span>
           {n} / {label}
@@ -238,8 +240,8 @@ export function PortfolioPage({ locale }: { locale: Locale }) {
   return (
     <ScrollExperience preference={motion}>
       <ScrollProgress />
-      <a className="skip" href="#produtos">
-        {t("skip.projects")}
+      <a className="skip" href="#sobre">
+        {t("skip.professional")}
       </a>
       <header>
         <a href="#inicio" className="logo">
@@ -257,12 +259,14 @@ export function PortfolioPage({ locale }: { locale: Locale }) {
         </button>
         <nav className={menu ? "open" : ""}>
           {[
+            { id: "sobre", key: "nav.professional" },
             { id: "produtos", key: "nav.products" },
             { id: "android", key: "nav.android" },
             { id: "laboratorio", key: "nav.studies" },
             { id: "atividade", key: "nav.githubActivity" },
             { id: "agora", key: "nav.liveActivity" },
-            { id: "sobre", key: "nav.about" },
+            { id: "leitura", key: "nav.reading" },
+            { id: "alem-do-codigo", key: "nav.about" },
           ].map(({ id, key }) => (
             <a
               key={id}
@@ -340,6 +344,25 @@ export function PortfolioPage({ locale }: { locale: Locale }) {
         </div>
         <Chapter
           n="02"
+          label={t("professional.chapter")}
+          id="sobre"
+          className="professional-about"
+          title={t("professional.title")}
+        >
+          <div className="professional-copy">
+            <Reveal>
+              <p>{t("professional.paragraph.one")}</p>
+            </Reveal>
+            <Reveal delay={0.08}>
+              <p>{t("professional.paragraph.two")}</p>
+            </Reveal>
+            <Reveal delay={0.16}>
+              <p>{t("professional.paragraph.three")}</p>
+            </Reveal>
+          </div>
+        </Chapter>
+        <Chapter
+          n="03"
           label={t("product.chapter")}
           id="produtos"
           title={
@@ -447,7 +470,7 @@ export function PortfolioPage({ locale }: { locale: Locale }) {
           </div>
         </Chapter>
         <Chapter
-          n="03"
+          n="04"
           label={t("android.chapter")}
           id="android"
           title={
@@ -518,7 +541,7 @@ export function PortfolioPage({ locale }: { locale: Locale }) {
           </div>
         </Chapter>
         <Chapter
-          n="04"
+          n="05"
           label={t("lab.chapter")}
           id="laboratorio"
           title={
@@ -598,7 +621,7 @@ export function PortfolioPage({ locale }: { locale: Locale }) {
           </details>
         </Chapter>
         <Chapter
-          n="05"
+          n="06"
           label={t("github.chapter")}
           id="atividade"
           title={
@@ -700,7 +723,8 @@ export function PortfolioPage({ locale }: { locale: Locale }) {
           <p className="footnote">{t("github.footnote")}</p>
         </Chapter>
         <LiveActivitySection locale={locale} />
-        <section className="about" id="sobre">
+        <ReadingLogSection locale={locale} />
+        <section className="about" id="alem-do-codigo">
           <div className="about-number">{t("about.chapter")}</div>
           <Reveal className="about-title">
             <span lang="ja">探求</span>

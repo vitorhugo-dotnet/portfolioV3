@@ -286,6 +286,35 @@ h2 {
   line-height: 1.9;
   margin: 25px 0 45px;
 }
+.professional-about h2 {
+  font-size: clamp(34px, 4vw, 52px);
+  letter-spacing: -2px;
+}
+.professional-copy {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(22px, 4vw, 56px);
+  margin-top: 25px;
+}
+.professional-copy > div {
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+}
+.professional-copy p {
+  max-width: 430px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.9;
+}
+.professional-copy strong {
+  color: var(--ink);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: var(--red);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+}
 .products {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -499,6 +528,84 @@ h2 {
   grid-template-columns: repeat(2, 1fr);
   border-top: 1px solid var(--line);
   border-left: 1px solid var(--line);
+}
+.reading-shelves {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+.reading-shelf {
+  min-width: 0;
+  padding: 22px;
+  border: 1px solid var(--line);
+  background: #11171d;
+}
+.reading-shelf h3 {
+  min-height: 2.5em;
+  margin: 0 0 18px;
+  color: var(--ink);
+  font:
+    500 17px "Space Grotesk",
+    sans-serif;
+}
+.reading-book-list {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.reading-book {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  color: var(--ink);
+  text-decoration: none;
+}
+.reading-book-cover {
+  display: grid;
+  width: 56px;
+  height: 78px;
+  overflow: hidden;
+  place-items: center;
+  border: 1px solid var(--line);
+  background: #1a222b;
+}
+.reading-book-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.reading-cover-fallback {
+  color: var(--red);
+  font-size: 24px;
+}
+.reading-book-copy {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+.reading-book-copy strong {
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.reading-book-copy > span {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+.reading-book-link {
+  align-self: start;
+  color: var(--red);
+  font-size: 12px;
+}
+.reading-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
 }
 .study {
   padding: 30px;
@@ -714,6 +821,16 @@ footer > a:last-child {
   color: #919a9f;
   letter-spacing: 1px;
 }
+.site-footer {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+}
+.site-footer > span {
+  text-align: center;
+}
+.site-footer > a:last-child {
+  justify-self: end;
+}
 .skip {
   position: fixed;
   top: -100px;
@@ -761,6 +878,9 @@ footer > a:last-child {
   }
   .products {
     grid-template-columns: 1fr;
+  }
+  .professional-copy {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .product {
     display: grid;
@@ -900,6 +1020,17 @@ footer > a:last-child {
   .intro {
     font-size: 13px;
   }
+  .professional-about h2 {
+    font-size: 36px;
+    letter-spacing: -1.5px;
+  }
+  .professional-copy {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+  .professional-copy p {
+    font-size: 13px;
+  }
   .product {
     display: block;
   }
@@ -927,6 +1058,12 @@ footer > a:last-child {
   }
   .studies {
     grid-template-columns: 1fr;
+  }
+  .reading-shelves {
+    grid-template-columns: 1fr;
+  }
+  .reading-shelf h3 {
+    min-height: 0;
   }
   .study {
     padding: 25px;
@@ -1001,6 +1138,18 @@ footer > a:last-child {
   }
   footer > a:last-child {
     font-size: 8px;
+  }
+  .site-footer {
+    grid-template-columns: 1fr auto;
+  }
+  .site-footer > span {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    max-width: none;
+  }
+  .site-footer > a:last-child {
+    grid-column: 2;
+    grid-row: 1;
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -1376,6 +1525,9 @@ fieldset.activity-tabs {
   min-width: 0;
 }
 .live-card {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   height: 100%;
   min-height: 245px;
   padding: 1.6rem;
@@ -1383,6 +1535,32 @@ fieldset.activity-tabs {
   background: #10171d;
   display: flex;
   flex-direction: column;
+}
+.live-card-cover {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  pointer-events: none;
+}
+.live-card-cover img {
+  object-fit: cover;
+  object-position: center;
+  opacity: 0.38;
+}
+.live-card-cover::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    rgb(16 23 29 / 98%) 0%,
+    rgb(16 23 29 / 88%) 48%,
+    rgb(16 23 29 / 42%) 100%
+  );
+}
+.live-card > :not(.live-card-cover) {
+  position: relative;
+  z-index: 1;
 }
 .live-card-heading {
   display: flex;

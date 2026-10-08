@@ -1,6 +1,6 @@
 # Hugo — Code Dojo
 
-Vitor Hugo's portfolio uses Next.js App Router, React, TypeScript and static export. The Japanese landscape, product cards, Android mockup, laboratory filters, repository search and GitHub activity keep the original visual identity.
+Vitor Hugo's portfolio uses Next.js App Router, React, TypeScript and static export. A concise professional introduction now follows the Hero, while the personal “Além do código” section, Japanese landscape, product cards, Android mockup, laboratory filters, repository search and GitHub activity keep the original visual identity.
 
 ## Local development
 
@@ -17,7 +17,7 @@ The portfolio is available in Brazilian Portuguese (`pt-BR`) at `/` and English 
 
 The locale-specific route wrappers share `components/portfolio-page.tsx` and the same underlying activity integrations. English is rendered as static HTML at build time, just like Portuguese. The Portuguese route group supplies `lang="pt-BR"`; `/en` has its own layout with `lang="en"`.
 
-Presentation copy lives in `i18n/dictionaries/pt-BR.ts` and `i18n/dictionaries/en.ts`. `i18n/dictionaries/pt-BR.ts` defines the translation key shape and the English dictionary must satisfy it, so mismatched keys fail TypeScript validation. Components call `translate(locale, key, values)` for plain, interpolated, and pluralized messages. Locale-aware date, number, duration and relative-time helpers are in `i18n/format.ts`. Integration payload values and identifiers remain language-neutral; translated labels are applied at presentation time.
+Presentation copy lives in `i18n/dictionaries/pt-BR.ts` and `i18n/dictionaries/en.ts`. `i18n/dictionaries/pt-BR.ts` defines the translation key shape and the English dictionary must satisfy it, so mismatched keys fail TypeScript validation. Components call `translate(locale, key, values)` for plain, interpolated, and pluralized messages. Locale-aware date, number, duration and relative-time helpers are in `i18n/translate.ts`. Integration payload values and identifiers remain language-neutral; translated labels are applied at presentation time.
 
 To add a message, add the same key to both dictionaries, then use its typed key in the component. To add another language, add its locale and dictionary, extend the route and metadata mapping, and include it in the sitemap alternates and switcher. Localized metadata is built through `localizedHomepageMetadata`: each homepage gets its own canonical, title, description, Open Graph locale and reciprocal `hreflang` links (`pt-BR`, `en`, and `x-default`). `app/sitemap.ts` creates the primary multilingual sitemap with Next.js `MetadataRoute.Sitemap`; `app/robots.ts` allows public paths and points crawlers to it. The existing host-specific sitemap set remains available through `/sitemap-index.xml`.
 
@@ -79,7 +79,7 @@ Actual deployments require these settings and account access. Tests and dry-runs
 
 ## Live activity
 
-Section **06 — “O que estou fazendo agora?”** follows the GitHub timeline with WakaTime, Spotify, Simkl and Steam cards. The GitHub timeline remains section 05, “Além do código” is 07 and contact is 08. The frontend polls only the public Worker endpoint while the section and tab are visible, at 60-second intervals without overlapping requests. It shows skeletons, empty/disconnected/unavailable provider states, update time and a stale-data indicator after two minutes.
+Section **07 — “O que estou fazendo agora?”** follows the GitHub timeline with WakaTime, Spotify, Simkl and Steam cards. The professional introduction is section 02, the GitHub timeline remains section 06, the Goodreads reading log is 08, “Além do código” is 09 and contact is 10. The frontend polls only the public Worker endpoint while the section and tab are visible, at 60-second intervals without overlapping requests. It shows skeletons, empty/disconnected/unavailable provider states, update time and a stale-data indicator after two minutes.
 
 `worker/src/index.ts` serves `GET /api/activity`; each adapter returns only normalized public activity. The Cache API stores that DTO for 60 seconds per Worker origin. Query strings do not create new cache entries. CORS is applied separately for each response, allowing the two portfolio domains and this project's Pages/preview domains. Localhost is allowed only for local development. CORS is not authentication; all returned activity is intentionally public.
 

@@ -116,15 +116,27 @@ function details(
   if (provider === "steam" && data.steam)
     return {
       title: data.steam.game ?? translate(locale, "live.steam.fallback"),
-      subtitle:
+      subtitle: [
         data.steam.isPlaying && !stale
           ? translate(locale, "live.steam.pause")
           : translate(locale, "live.steam.recentDescription"),
+        data.steam.totalPlaytimeMinutes !== undefined
+          ? translate(locale, "live.steam.playtime", {
+              hours: new Intl.NumberFormat(
+                locale === "pt-BR" ? "pt-BR" : "en-US",
+                { maximumFractionDigits: 1 },
+              ).format(data.steam.totalPlaytimeMinutes / 60),
+            })
+          : undefined,
+      ]
+        .filter(Boolean)
+        .join(" · "),
       status:
         data.steam.isPlaying && !stale
           ? translate(locale, "live.steam.now")
           : translate(locale, "live.steam.recent"),
       image: data.steam.imageUrl,
+      cover: data.steam.coverUrl,
       url: data.steam.externalUrl,
       observedAt: data.steam.observedAt,
     };
@@ -338,7 +350,7 @@ export function LiveActivitySection({ locale }: { locale: Locale }) {
   return (
     <section ref={section} id="agora" className="chapter live-activity">
       <div className="section-label">
-        <span>06 / {t("live.chapter")}</span>
+        <span>07 / {t("live.chapter")}</span>
         <span>HUGO.DEV ↙</span>
       </div>
       <Reveal>
