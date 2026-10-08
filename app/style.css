@@ -90,6 +90,25 @@ nav a:hover,
   gap: 1.2rem;
   flex-shrink: 0;
 }
+.language-switcher {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font: 10px monospace;
+  white-space: nowrap;
+  color: #929ba3;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.language-switcher a.active {
+  color: var(--red);
+  font-weight: 700;
+}
+.language-switcher a:hover {
+  color: var(--ink);
+}
 .mobile-menu {
   display: none;
 }
@@ -775,6 +794,10 @@ footer > a:last-child {
   }
   .header-link {
     margin: 0;
+  }
+  .language-switcher {
+    gap: 4px;
+    font-size: 9px;
   }
   .mobile-menu {
     display: block;

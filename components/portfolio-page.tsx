@@ -1,8 +1,26 @@
 "use client";
 import Link from "next/link";
 import type { AnchorHTMLAttributes, ReactNode } from "react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { Locale } from "../i18n/config.ts";
+import type { DictionaryKey } from "../i18n/translate.ts";
+import {
+  formatDate,
+  formatRelativeTime,
+  translate,
+} from "../i18n/translate.ts";
+import {
+  fetchGitHubUsername,
+  githubProfileUrl,
+  githubRepositoryUrl,
+  githubUsernameLookup,
+} from "../lib/github.ts";
+import {
+  describeGitHubEvent,
+  type GitHubEventPresentation,
+} from "../lib/github-event-presentation.ts";
+import { linkedInProfileForHostname } from "../lib/site-config.ts";
+import { LanguageSwitcher } from "./language-switcher";
 import { LiveActivitySection } from "./live-activity";
 import {
   DepthLayer,
@@ -13,32 +31,19 @@ import {
   TechnologyBadges,
   useActiveSection,
 } from "./scroll-motion";
-import {
-  fetchGitHubUsername,
-  githubProfileUrl,
-  githubRepositoryUrl,
-  githubUsernameLookup,
-} from "../lib/github.ts";
-import { linkedInProfileForHostname } from "../lib/site-config.ts";
 
 type StudyLanguage = "Java" | "C#";
-type StudyFilter = "Todos" | StudyLanguage;
-type ActivityTab = "Tudo" | "Commits" | "PRs" | "Issues" | "Releases";
+type StudyFilter = "all" | StudyLanguage;
+type ActivityTab = "all" | "commits" | "pullRequests" | "issues" | "releases";
 
-type GitHubEventPayload = {
-  ref?: string;
-  ref_type?: string;
-  action?: string;
-  pull_request?: { title?: string; html_url?: string };
-  issue?: { title?: string; html_url?: string };
-  release?: { name?: string; tag_name?: string; html_url?: string };
-};
-
-type GitHubEvent = {
+type GitHubEvent = GitHubEventPresentation & {
   id: string;
-  type: string;
   repo: { name: string };
-  payload?: GitHubEventPayload;
+  payload?: GitHubEventPresentation["payload"] & {
+    pull_request?: { title?: string; html_url?: string };
+    issue?: { title?: string; html_url?: string };
+    release?: { name?: string; tag_name?: string; html_url?: string };
+  };
   created_at: string;
 };
 
@@ -61,55 +66,24 @@ type ExternalProps = AnchorHTMLAttributes<HTMLAnchorElement> & {
   children: ReactNode;
 };
 const studies = [
-  [
-    "springboot-microservice-resilience",
-    "Java",
-    "Resiliência sob pressão",
-    "Falhas, retries e circuit breakers em microsserviços.",
-  ],
-  [
-    "java-distributed-job-lock",
-    "Java",
-    "Um job. Uma execução.",
-    "Coordenação de tarefas em ambientes distribuídos.",
-  ],
-  [
-    "dotnet-distributed-job-lock",
-    "C#",
-    "Concorrência sob controle",
-    "Distributed locks para processamento de jobs.",
-  ],
-  [
-    "springboot-feature-flag-kill-switch",
-    "Java",
-    "O botão de emergência",
-    "Feature flags em runtime e kill switch.",
-  ],
-  [
-    "dotnet-feature-flag-kill-switch",
-    "C#",
-    "Desligar sem redeploy",
-    "Controle de funcionalidades com .NET.",
-  ],
-  [
-    "finance-tracker-services",
-    "Java",
-    "Eventos que movem dinheiro",
-    "Estudo de arquitetura financeira distribuída.",
-  ],
-  [
-    "aspnet-rate-limit-ip",
-    "C#",
-    "Cada requisição tem seu limite",
-    "Rate limiting por IP com ASP.NET Core.",
-  ],
-  [
-    "distributed-gateway-order-system",
-    "Java",
-    "Do gateway ao pedido",
-    "Gateway e serviços para um fluxo distribuído.",
-  ],
-];
+  ["springboot-microservice-resilience", "Java", "resilience"],
+  ["java-distributed-job-lock", "Java", "singleJob"],
+  ["dotnet-distributed-job-lock", "C#", "concurrency"],
+  ["springboot-feature-flag-kill-switch", "Java", "emergency"],
+  ["dotnet-feature-flag-kill-switch", "C#", "deploy"],
+  ["finance-tracker-services", "Java", "money"],
+  ["aspnet-rate-limit-ip", "C#", "limits"],
+  ["distributed-gateway-order-system", "Java", "gateway"],
+] as const;
+
+function useTranslation(locale: Locale) {
+  return useCallback(
+    (key: DictionaryKey, values?: Record<string, string | number>) =>
+      translate(locale, key, values),
+    [locale],
+  );
+}
+
 function Chapter({ n, label, title, children, id }: ChapterProps) {
   return (
     <section id={id} className="chapter">
@@ -133,13 +107,13 @@ function External({ href, children, ...props }: ExternalProps) {
     </a>
   );
 }
-function Landscape() {
+function Landscape({ locale }: { locale: Locale }) {
   return (
     <svg
       className="landscape"
       viewBox="0 0 1200 900"
       role="img"
-      aria-label="Paisagem japonesa ilustrada, com montanhas, um sol vermelho e um portal torii"
+      aria-label={translate(locale, "image.japaneseLandscape")}
     >
       <defs>
         <linearGradient id="sky" x2="0" y2="1">
@@ -188,12 +162,14 @@ function Landscape() {
   );
 }
 export function PortfolioPage({ locale }: { locale: Locale }) {
-  void locale;
-  const [filter, setFilter] = useState<StudyFilter>("Todos");
-  const [tab, setTab] = useState<ActivityTab>("Tudo");
+  const t = useTranslation(locale);
+  const [filter, setFilter] = useState<StudyFilter>("all");
+  const [tab, setTab] = useState<ActivityTab>("all");
   const [events, setEvents] = useState<GitHubEvent[]>([]);
-  const [status, setStatus] = useState("Carregando atividades…");
-  const [updated, setUpdated] = useState("");
+  const [statusKey, setStatusKey] = useState<DictionaryKey>(
+    "github.status.loading",
+  );
+  const [updatedAt, setUpdatedAt] = useState<number | null>(null);
   const [limit, setLimit] = useState(8);
   const [query, setQuery] = useState("");
   const [repos, setRepos] = useState<Repository[]>([]);
@@ -225,8 +201,8 @@ export function PortfolioPage({ locale }: { locale: Locale }) {
         const e = (await r.json()) as GitHubEvent[];
         if (live) {
           setEvents(e);
-          setStatus("Atividades públicas do GitHub");
-          setUpdated(new Date().toLocaleString("pt-BR"));
+          setStatusKey("github.status.public");
+          setUpdatedAt(Date.now());
         }
       } catch {
         try {
@@ -234,10 +210,10 @@ export function PortfolioPage({ locale }: { locale: Locale }) {
           const e = (await r.json()) as GitHubEvent[];
           if (live) {
             setEvents(e);
-            setStatus("Snapshot público · 07/10/2026");
+            setStatusKey("github.status.snapshot");
           }
         } catch {
-          if (live) setStatus("Não foi possível carregar. Veja o GitHub.");
+          if (live) setStatusKey("github.status.unavailable");
         }
       }
     }
@@ -246,50 +222,24 @@ export function PortfolioPage({ locale }: { locale: Locale }) {
       live = false;
     };
   }, []);
-  const types: Record<Exclude<ActivityTab, "Tudo">, readonly string[]> = {
-    Commits: ["PushEvent"],
-    PRs: [
+  const types: Record<Exclude<ActivityTab, "all">, readonly string[]> = {
+    commits: ["PushEvent"],
+    pullRequests: [
       "PullRequestEvent",
       "PullRequestReviewEvent",
       "PullRequestReviewCommentEvent",
     ],
-    Issues: ["IssuesEvent", "IssueCommentEvent"],
-    Releases: ["ReleaseEvent"],
+    issues: ["IssuesEvent", "IssueCommentEvent"],
+    releases: ["ReleaseEvent"],
   };
   const shown = events.filter(
-    (e) => tab === "Tudo" || types[tab]?.includes(e.type),
+    (e) => tab === "all" || types[tab]?.includes(e.type),
   );
-  function describe(e: GitHubEvent): string {
-    const p: GitHubEventPayload = e.payload ?? {};
-    if (e.type === "PushEvent")
-      return (
-        "Código atualizado" +
-        (p.ref ? ` · ${p.ref.replace("refs/heads/", "")}` : "")
-      );
-    if (e.type === "PullRequestEvent")
-      return (
-        "Pull request " +
-        (p.action || "") +
-        " · " +
-        (p.pull_request?.title || "")
-      );
-    if (e.type === "IssuesEvent")
-      return `Issue ${p.action || ""} · ${p.issue?.title || ""}`;
-    if (e.type === "IssueCommentEvent")
-      return `Comentário · ${p.issue?.title || ""}`;
-    if (e.type === "ReleaseEvent")
-      return `Release · ${p.release?.name || p.release?.tag_name || ""}`;
-    if (e.type === "WatchEvent") return "Adicionado aos favoritos";
-    if (e.type === "CreateEvent")
-      return `Criado: ${p.ref || p.ref_type || "repositório"}`;
-    if (e.type === "ForkEvent") return "Fork criado";
-    return e.type.replace("Event", "").replace(/([a-z])([A-Z])/g, "$1 $2");
-  }
   return (
     <ScrollExperience preference={motion}>
       <ScrollProgress />
       <a className="skip" href="#produtos">
-        Pular para projetos
+        {t("skip.projects")}
       </a>
       <header>
         <a href="#inicio" className="logo">
@@ -301,32 +251,34 @@ export function PortfolioPage({ locale }: { locale: Locale }) {
           className="mobile-menu"
           onClick={() => setMenu(!menu)}
           aria-expanded={menu}
+          aria-label={menu ? t("menu.close") : t("menu.open")}
         >
-          Menu {menu ? "−" : "+"}
+          {t("menu.open")} {menu ? "−" : "+"}
         </button>
         <nav className={menu ? "open" : ""}>
           {[
-            ["produtos", "Produtos"],
-            ["android", "Android"],
-            ["laboratorio", "Laboratório"],
-            ["atividade", "Atividade"],
-            ["agora", "Agora"],
-            ["sobre", "Além do código"],
-          ].map(([id, label]) => (
+            { id: "produtos", key: "nav.products" },
+            { id: "android", key: "nav.android" },
+            { id: "laboratorio", key: "nav.studies" },
+            { id: "atividade", key: "nav.githubActivity" },
+            { id: "agora", key: "nav.liveActivity" },
+            { id: "sobre", key: "nav.about" },
+          ].map(({ id, key }) => (
             <a
               key={id}
               aria-current={activeSection === id ? "location" : undefined}
               href={`#${id}`}
               onClick={() => setMenu(false)}
             >
-              {label}
+              {t(key as DictionaryKey)}
             </a>
           ))}
           <Link href="/hub" onClick={() => setMenu(false)}>
-            Hub
+            {t("nav.hub")}
           </Link>
         </nav>
         <div className="header-socials">
+          <LanguageSwitcher locale={locale} />
           <External className="header-link" href={linkedinProfile}>
             LinkedIn ↗
           </External>
@@ -339,7 +291,7 @@ export function PortfolioPage({ locale }: { locale: Locale }) {
         <HeroScene
           art={
             <>
-              <Landscape />
+              <Landscape locale={locale} />
               <DepthLayer className="vertical-jp" distance={55}>
                 <span lang="ja">創造 · 探求 · コード</span>
               </DepthLayer>
@@ -348,37 +300,38 @@ export function PortfolioPage({ locale }: { locale: Locale }) {
         >
           <div className="hero-content">
             <div className="eyebrow">
-              <i /> FULL-STACK DEVELOPER · BRASIL
+              <i /> {t("hero.label")}
             </div>
             <h1>
-              Entre código
-              <br />e <em>caos.</em>
+              {t("hero.title.firstLine")}
+              <br />
+              <em>{t("hero.title.secondLine")}</em>
             </h1>
             <p>
-              Construo sistemas. Exploro ideias.
+              {t("hero.intro.firstLine")}
               <br />
-              Java, C# e uma curiosidade que não cabe no terminal.
+              {t("hero.intro.secondLine")}
             </p>
             <div className="hero-actions">
               <a className="button" href="#produtos">
-                Explore meus projetos <span>↘</span>
+                {t("hero.action.projects")} <span>↘</span>
               </a>
-              <External href={gh}>Conheça o código ↗</External>
+              <External href={gh}>{t("hero.action.github")} ↗</External>
             </div>
             <div className="hero-stack">
               JAVA / SPRING <b>✳</b> C# / .NET <b>✳</b> REACT / FLUTTER
             </div>
           </div>
           <div className="hero-bottom">
-            <span>01 — UMA JORNADA EM CONSTRUÇÃO</span>
+            <span>{t("hero.storyline")}</span>
             <button
               type="button"
               onClick={() => setMotion(!motion)}
               aria-pressed={motion}
             >
-              Movimento {motion ? "ON" : "OFF"}
+              {t("hero.motion")} {motion ? "ON" : "OFF"}
             </button>
-            <a href="#produtos">SCROLL PARA EXPLORAR ↓</a>
+            <a href="#produtos">{t("hero.scroll")} ↓</a>
           </div>
         </HeroScene>
         <div className="ticker" aria-hidden="true">
@@ -387,20 +340,17 @@ export function PortfolioPage({ locale }: { locale: Locale }) {
         </div>
         <Chapter
           n="02"
-          label="PRODUTOS & PLATAFORMAS"
+          label={t("product.chapter")}
           id="produtos"
           title={
             <>
-              Ideias que saíram
+              {t("product.title.firstLine")}
               <br />
-              do <em>localhost.</em>
+              <em>{t("product.title.secondLine")}</em>
             </>
           }
         >
-          <p className="intro">
-            Áudio, vídeo e automação. Projetos com uma finalidade, uma
-            arquitetura e bastante código por trás.
-          </p>
+          <p className="intro">{t("product.intro")}</p>
           <div className="products">
             <Reveal className="product-reveal">
               <article className="product sonic">
@@ -421,20 +371,17 @@ export function PortfolioPage({ locale }: { locale: Locale }) {
                   </div>
                 </DepthLayer>
                 <div className="product-copy">
-                  <span className="tag">01 / ÁUDIO EM TEMPO REAL</span>
+                  <span className="tag">{t("product.sonic.tag")}</span>
                   <h3>SonicRelay</h3>
-                  <p>
-                    O áudio do seu PC, no seu celular. Publisher desktop e
-                    viewer mobile conectados por WebRTC.
-                  </p>
+                  <p>{t("product.sonic.description")}</p>
                   <TechnologyBadges
                     labels={["C#", "Avalonia", "Flutter", "WebRTC"]}
                   />
                   <External href={githubRepo("desktop_dotnet_SonicRelay")}>
-                    Desktop ↗
+                    {t("product.desktop")} ↗
                   </External>
                   <External href={githubRepo("flutter_mobile-web_SonicRelay")}>
-                    Mobile ↗
+                    {t("product.mobile")} ↗
                   </External>
                 </div>
               </article>
@@ -451,15 +398,12 @@ export function PortfolioPage({ locale }: { locale: Locale }) {
                   </div>
                 </DepthLayer>
                 <div className="product-copy">
-                  <span className="tag">02 / COMPARTILHAMENTO DE TELA</span>
+                  <span className="tag">{t("product.frame.tag")}</span>
                   <h3>FrameRelay</h3>
-                  <p>
-                    Tela e áudio em tempo real. Um laboratório de captura,
-                    codecs e comunicação entre dispositivos.
-                  </p>
+                  <p>{t("product.frame.description")}</p>
                   <TechnologyBadges labels={[".NET", "Avalonia", "WebRTC"]} />
                   <External href={githubRepo("dotnet_FrameRelay")}>
-                    Explorar projeto ↗
+                    {t("product.explore")} ↗
                   </External>
                 </div>
               </article>
@@ -469,30 +413,33 @@ export function PortfolioPage({ locale }: { locale: Locale }) {
                 <DepthLayer className="product-depth" distance={20}>
                   <div className="product-visual pipeline" aria-hidden="true">
                     <span>APPLICATION_PIPELINE</span>
-                    {["APPLIED", "INTERVIEW", "NEXT STEP"].map((s, i) => (
-                      <div key={s}>
+                    {(
+                      [
+                        "product.job.stage.applied",
+                        "product.job.stage.interview",
+                        "product.job.stage.nextStep",
+                      ] as const
+                    ).map((key, i) => (
+                      <div key={key}>
                         <b>0{i + 1}</b>
-                        {s}
+                        {t(key)}
                         <i>↗</i>
                       </div>
                     ))}
                   </div>
                 </DepthLayer>
                 <div className="product-copy">
-                  <span className="tag">03 / ORGANIZAÇÃO & AUTOMAÇÃO</span>
+                  <span className="tag">{t("product.job.tag")}</span>
                   <h3>JobApplyTracker</h3>
-                  <p>
-                    Uma plataforma para organizar candidaturas, acompanhar o
-                    processo e integrar o fluxo de busca.
-                  </p>
+                  <p>{t("product.job.description")}</p>
                   <TechnologyBadges
                     labels={["Spring Boot", "React", "OAuth2"]}
                   />
                   <External href={githubRepo("SpringBoot-JobApplyTracker")}>
-                    Backend ↗
+                    {t("product.backend")} ↗
                   </External>
                   <External href={githubRepo("React-JobApplyTracker")}>
-                    Frontend ↗
+                    {t("product.frontend")} ↗
                   </External>
                 </div>
               </article>
@@ -501,13 +448,13 @@ export function PortfolioPage({ locale }: { locale: Locale }) {
         </Chapter>
         <Chapter
           n="03"
-          label="ANDROID APPS"
+          label={t("android.chapter")}
           id="android"
           title={
             <>
-              Código para levar
+              {t("android.title.firstLine")}
               <br />
-              no <em>bolso.</em>
+              <em>{t("android.title.secondLine")}</em>
             </>
           }
         >
@@ -516,15 +463,15 @@ export function PortfolioPage({ locale }: { locale: Locale }) {
               <div
                 className="phone"
                 role="img"
-                aria-label="Ilustração conceitual do SonicRelay, não uma captura real"
+                aria-label={t("android.imageAlt")}
               >
                 <div className="notch" />
-                <small>SONICRELAY / CONCEITO VISUAL</small>
+                <small>{t("android.concept")}</small>
                 <div className="phone-symbol">◉</div>
                 <h3>
-                  Seu áudio.
+                  {t("android.phone.firstLine")}
                   <br />
-                  Outro lugar.
+                  {t("android.phone.secondLine")}
                 </h3>
                 <div className="phone-wave">▂ ▄ ▆ █ ▅ ▃ ▆ █ ▄ ▂</div>
                 <span>PC ↔ ANDROID</span>
@@ -535,29 +482,34 @@ export function PortfolioPage({ locale }: { locale: Locale }) {
                 [
                   "SonicRelay",
                   "flutter_mobile-web_SonicRelay",
-                  "Viewer mobile para receber o áudio transmitido pelo desktop.",
+                  "android.sonic.description",
                 ],
                 [
                   "The Universe Decides",
                   "the_universe_decides",
-                  "Projeto de aplicativo: explore a implementação e os recursos no repositório.",
+                  "android.universe.description",
                 ],
                 [
                   "Hydration Tracker",
                   "Hydration-Tracker",
-                  "Projeto dedicado ao acompanhamento da hidratação.",
+                  "android.hydration.description",
                 ],
               ].map(([name, repo, desc], i) => (
                 <Reveal key={name} delay={i * 0.08}>
                   <article>
-                    <span className="tag">0{i + 1} / MOBILE</span>
+                    <span className="tag">
+                      {t("android.app.tag", {
+                        number: i + 1,
+                        platform: t("android.app.platform"),
+                      })}
+                    </span>
                     <h3>{name}</h3>
-                    <p>{desc}</p>
+                    <p>{t(desc as DictionaryKey)}</p>
                     <External href={githubRepo(repo)}>
-                      Código & documentação ↗
+                      {t("android.documentation")} ↗
                     </External>
                     <External href={`${githubRepo(repo)}/releases`}>
-                      Ver releases ↗
+                      {t("android.releases")} ↗
                     </External>
                   </article>
                 </Reveal>
@@ -567,38 +519,42 @@ export function PortfolioPage({ locale }: { locale: Locale }) {
         </Chapter>
         <Chapter
           n="04"
-          label="LABORATÓRIO"
+          label={t("lab.chapter")}
           id="laboratorio"
           title={
             <>
-              Curiosidade.
+              {t("lab.title.firstLine")}
               <br />
-              <em>Em execução.</em>
+              <em>{t("lab.title.secondLine")}</em>
             </>
           }
         >
           <div className="filter-row">
-            <fieldset className="tabs" aria-label="Filtrar estudos">
-              {(["Todos", "Java", "C#"] as const).map((f) => (
+            <fieldset className="tabs" aria-label={t("lab.filter.label")}>
+              {(
+                [
+                  ["all", "lab.filter.all"],
+                  ["Java", "Java"],
+                  ["C#", "C#"],
+                ] as const
+              ).map(([value, label]) => (
                 <button
                   type="button"
-                  key={f}
-                  className={filter === f ? "active" : ""}
-                  onClick={() => setFilter(f)}
-                  aria-pressed={filter === f}
+                  key={value}
+                  className={filter === value ? "active" : ""}
+                  onClick={() => setFilter(value)}
+                  aria-pressed={filter === value}
                 >
-                  {f}
+                  {label === "Java" || label === "C#" ? label : t(label)}
                 </button>
               ))}
             </fieldset>
-            <span className="tag">
-              EXPERIMENTOS / ARQUITETURA / APRENDIZADO
-            </span>
+            <span className="tag">{t("lab.experiments")}</span>
           </div>
           <div className="studies">
             {studies
-              .filter((s) => filter === "Todos" || s[1] === filter)
-              .map(([repo, lang, title, desc], i) => (
+              .filter((s) => filter === "all" || s[1] === filter)
+              .map(([repo, lang, copy], i) => (
                 <Reveal
                   key={repo}
                   className="study-reveal"
@@ -608,8 +564,8 @@ export function PortfolioPage({ locale }: { locale: Locale }) {
                     <span className="tag">
                       {lang} <span>↗</span>
                     </span>
-                    <h3>{title}</h3>
-                    <p>{desc}</p>
+                    <h3>{t(`lab.study.${copy}.title` as DictionaryKey)}</h3>
+                    <p>{t(`lab.study.${copy}.description` as DictionaryKey)}</p>
                     <code>{repo}</code>
                   </External>
                 </Reveal>
@@ -617,14 +573,14 @@ export function PortfolioPage({ locale }: { locale: Locale }) {
           </div>
           <details className="repo-browser">
             <summary>
-              Explorar todos os repositórios públicos <span>+</span>
+              {t("lab.repo.summary")} <span>+</span>
             </summary>
             <label>
-              Buscar repositório
+              {t("lab.repo.search")}
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Java, Flutter, MCP…"
+                placeholder={t("lab.repo.placeholder")}
               />
             </label>
             <div className="repo-results">
@@ -635,7 +591,7 @@ export function PortfolioPage({ locale }: { locale: Locale }) {
                 .map((r) => (
                   <External key={r.name} href={githubRepo(r.name)}>
                     {r.name}
-                    {r.archived ? " · arquivado" : ""} ↗
+                    {r.archived ? ` · ${t("lab.repo.archived")}` : ""} ↗
                   </External>
                 ))}
             </div>
@@ -643,43 +599,58 @@ export function PortfolioPage({ locale }: { locale: Locale }) {
         </Chapter>
         <Chapter
           n="05"
-          label="GITHUB ACTIVITY"
+          label={t("github.chapter")}
           id="atividade"
           title={
             <>
-              O código
+              {t("github.title.firstLine")}
               <br />
-              não <em>para.</em>
+              <em>{t("github.title.secondLine")}</em>
             </>
           }
         >
           <div className="activity-heading">
             <p>
-              {status}
-              {updated && <small>Atualizado em {updated}</small>}
+              {t(statusKey)}
+              {updatedAt && (
+                <small>
+                  {t("github.status.updated", {
+                    date: formatDate(locale, updatedAt, {
+                      dateStyle: "short",
+                      timeStyle: "short",
+                    }),
+                  })}
+                </small>
+              )}
             </p>
-            <External href={gh}>Perfil completo ↗</External>
+            <External href={gh}>{t("github.profile")} ↗</External>
           </div>
           <fieldset
             className="tabs activity-tabs"
-            aria-label="Tipo de atividade"
+            aria-label={t("github.filter.label")}
           >
-            {(["Tudo", "Commits", "PRs", "Issues", "Releases"] as const).map(
-              (t) => (
-                <button
-                  type="button"
-                  key={t}
-                  className={tab === t ? "active" : ""}
-                  onClick={() => {
-                    setTab(t);
-                    setLimit(8);
-                  }}
-                  aria-pressed={tab === t}
-                >
-                  {t}
-                </button>
-              ),
-            )}
+            {(
+              [
+                ["all", "github.filter.all"],
+                ["commits", "github.filter.commits"],
+                ["pullRequests", "github.filter.pullRequests"],
+                ["issues", "github.filter.issues"],
+                ["releases", "github.filter.releases"],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                type="button"
+                key={value}
+                className={tab === value ? "active" : ""}
+                onClick={() => {
+                  setTab(value);
+                  setLimit(8);
+                }}
+                aria-pressed={tab === value}
+              >
+                {t(label)}
+              </button>
+            ))}
           </fieldset>
           <div className="events">
             {shown.slice(0, limit).map((e) => (
@@ -702,18 +673,18 @@ export function PortfolioPage({ locale }: { locale: Locale }) {
                 </span>
                 <div>
                   <b>{e.repo.name.replace("vitorhugo-dotnet/", "")}</b>
-                  <p>{describe(e)}</p>
+                  <p>{describeGitHubEvent(locale, e)}</p>
                 </div>
                 <time dateTime={e.created_at}>
-                  {new Date(e.created_at).toLocaleDateString("pt-BR")}
+                  {formatRelativeTime(locale, e.created_at)}
                 </time>
                 <span>↗</span>
               </External>
             ))}
             {!shown.length && (
               <p className="empty">
-                Nenhum evento desse tipo no período disponível.{" "}
-                <External href={gh}>Confira o perfil ↗</External>
+                {t("github.empty")}{" "}
+                <External href={gh}>{t("github.empty.profile")} ↗</External>
               </p>
             )}
           </div>
@@ -723,62 +694,54 @@ export function PortfolioPage({ locale }: { locale: Locale }) {
               className="load-more"
               onClick={() => setLimit(limit + 12)}
             >
-              Carregar mais +
+              {t("github.loadMore")} +
             </button>
           )}
-          <p className="footnote">
-            Eventos públicos recentes. Esta timeline não representa o calendário
-            anual de contribuições nem atividades privadas.
-          </p>
+          <p className="footnote">{t("github.footnote")}</p>
         </Chapter>
-        <LiveActivitySection />
+        <LiveActivitySection locale={locale} />
         <section className="about" id="sobre">
-          <div className="about-number">07 / ALÉM DO CÓDIGO</div>
+          <div className="about-number">{t("about.chapter")}</div>
           <Reveal className="about-title">
             <span lang="ja">探求</span>
             <h2>
-              Nem toda pergunta
+              {t("about.title")}
               <br />
-              tem um <em>return.</em>
+              {t("about.title.secondLine")} <em>return.</em>
             </h2>
           </Reveal>
           <div className="about-bottom">
-            <p>
-              Entre sistemas distribuídos e universos fictícios. Cultura
-              japonesa, games, astronomia e filosofia alimentam a mesma vontade:
-              entender como as coisas funcionam — e o que podemos criar com
-              elas.
-            </p>
+            <p>{t("about.description")}</p>
             <div>
-              <span>JAPÃO & ANIME</span>
-              <span>GAMES & NARRATIVAS</span>
-              <span>ASTRONOMIA & FÍSICA</span>
-              <span>CAMUS & NIETZSCHE</span>
+              <span>{t("about.interests.japan")}</span>
+              <span>{t("about.interests.games")}</span>
+              <span>{t("about.interests.space")}</span>
+              <span>{t("about.interests.philosophy")}</span>
             </div>
           </div>
         </section>
         <section className="contact" id="contato">
           <Reveal>
-            <span className="tag">08 / PRÓXIMO CAPÍTULO</span>
+            <span className="tag">{t("contact.chapter")}</span>
           </Reveal>
           <h2>
-            Vamos construir
+            {t("contact.title.firstLine")}
             <br />
-            algo <em>interessante?</em>
+            <em>{t("contact.title.secondLine")}</em>
           </h2>
           <External className="button" href={linkedinProfile}>
-            Conversar no LinkedIn ↗
+            {t("contact.linkedin")} ↗
           </External>
-          <External href={gh}>Explorar o GitHub ↗</External>
+          <External href={gh}>{t("contact.github")} ↗</External>
         </section>
       </main>
       <footer>
         <a className="logo" href="#inicio">
           H<span>.</span>
         </a>
-        <span>VITOR HUGO · JAVA / C# · FEITO COM CURIOSIDADE</span>
-        <Link href="/hub">HUB / DOCUMENTOS ↗</Link>
-        <a href="#inicio">VOLTAR AO TOPO ↑</a>
+        <span>{t("footer.signature")}</span>
+        <Link href="/hub">{t("footer.hub")} ↗</Link>
+        <a href="#inicio">{t("footer.backToTop")} ↑</a>
       </footer>
     </ScrollExperience>
   );

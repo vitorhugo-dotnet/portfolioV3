@@ -2,6 +2,15 @@
 
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
+import type { Locale } from "../i18n/config.ts";
+import type { DictionaryKey } from "../i18n/translate.ts";
+import {
+  formatDate,
+  formatDuration,
+  formatNumber,
+  translate,
+  translatePlural,
+} from "../i18n/translate.ts";
 import {
   createActivityRefresh,
   isActivityStale,
@@ -16,28 +25,43 @@ import { Reveal } from "./scroll-motion";
 
 const labels: Record<
   Provider,
-  { title: string; symbol: string; category: string }
+  { title: string; symbol: string; category: DictionaryKey }
 > = {
-  coding: { title: "WakaTime", symbol: "⌘", category: "CÓDIGO" },
-  spotify: { title: "Spotify", symbol: "♫", category: "MÚSICA" },
-  simkl: { title: "Simkl", symbol: "▶", category: "ANIME & SÉRIES" },
-  steam: { title: "Steam", symbol: "✳", category: "JOGOS" },
+  coding: { title: "WakaTime", symbol: "⌘", category: "live.category.coding" },
+  spotify: { title: "Spotify", symbol: "♫", category: "live.category.music" },
+  simkl: {
+    title: "Simkl",
+    symbol: "▶",
+    category: "live.category.watching",
+  },
+  steam: { title: "Steam", symbol: "✳", category: "live.category.games" },
 };
 function details(
   provider: Provider,
   data: LiveActivityResponse,
   stale: boolean,
   now: number,
+  locale: Locale,
 ) {
   if (provider === "coding" && data.coding)
     return {
       title:
-        data.coding.project ?? data.coding.language ?? "Entre ideias e código",
+        data.coding.project ??
+        data.coding.language ??
+        translate(locale, "live.coding.fallback"),
       subtitle: [
         data.coding.file,
         data.coding.editor,
         data.coding.durationMinutes !== undefined
-          ? `${data.coding.durationMinutes} min hoje`
+          ? translatePlural(
+              locale,
+              "live.coding.today.one",
+              "live.coding.today.other",
+              data.coding.durationMinutes,
+              {
+                duration: formatDuration(locale, data.coding.durationMinutes),
+              },
+            )
           : undefined,
       ]
         .filter(Boolean)
@@ -46,18 +70,18 @@ function details(
         data.coding.observedAt &&
         now >= Date.parse(data.coding.observedAt) &&
         now - Date.parse(data.coding.observedAt) < 15 * 60000
-          ? "Codando agora"
-          : "Atividade de código recente",
+          ? translate(locale, "live.coding.now")
+          : translate(locale, "live.coding.recent"),
       observedAt: data.coding.observedAt,
     };
   if (provider === "spotify" && data.spotify)
     return {
-      title: data.spotify.track ?? "Música",
+      title: data.spotify.track ?? translate(locale, "live.spotify.fallback"),
       subtitle: data.spotify.artist,
       status:
         data.spotify.isPlaying && !stale
-          ? "Ouvindo agora"
-          : "Ouvido recentemente",
+          ? translate(locale, "live.spotify.now")
+          : translate(locale, "live.spotify.recent"),
       image: data.spotify.artworkUrl,
       url: data.spotify.externalUrl,
       observedAt: data.spotify.observedAt,
@@ -67,11 +91,15 @@ function details(
       title: data.simkl.title,
       subtitle: [
         data.simkl.mediaType === "tv"
-          ? "Série"
+          ? translate(locale, "live.simkl.series")
           : data.simkl.mediaType === "movie"
-            ? "Filme"
-            : "Anime",
-        data.simkl.episode ? `Episódio ${data.simkl.episode}` : undefined,
+            ? translate(locale, "live.simkl.movie")
+            : translate(locale, "live.simkl.anime"),
+        data.simkl.episode
+          ? translate(locale, "live.simkl.episode", {
+              episode: data.simkl.episode,
+            })
+          : undefined,
       ]
         .filter(Boolean)
         .join(" · "),
@@ -79,31 +107,31 @@ function details(
         data.simkl.isActive &&
         data.simkl.observedAt &&
         now - Date.parse(data.simkl.observedAt) < 40 * 60000
-          ? "Assistindo agora"
-          : "Assistido recentemente",
+          ? translate(locale, "live.simkl.now")
+          : translate(locale, "live.simkl.recent"),
       image: data.simkl.posterUrl,
       url: data.simkl.externalUrl,
       observedAt: data.simkl.observedAt,
     };
   if (provider === "steam" && data.steam)
     return {
-      title: data.steam.game ?? "Jogo",
+      title: data.steam.game ?? translate(locale, "live.steam.fallback"),
       subtitle:
         data.steam.isPlaying && !stale
-          ? "Uma pausa entre builds."
-          : "Um dos jogos das últimas duas semanas.",
+          ? translate(locale, "live.steam.pause")
+          : translate(locale, "live.steam.recentDescription"),
       status:
         data.steam.isPlaying && !stale
-          ? "Jogando agora"
-          : "Jogado recentemente",
+          ? translate(locale, "live.steam.now")
+          : translate(locale, "live.steam.recent"),
       image: data.steam.imageUrl,
       url: data.steam.externalUrl,
       observedAt: data.steam.observedAt,
     };
   return undefined;
 }
-function displayTime(value: string) {
-  return new Date(value).toLocaleString("pt-BR", {
+function displayTime(locale: Locale, value: string) {
+  return formatDate(locale, value, {
     day: "2-digit",
     month: "2-digit",
     hour: "2-digit",
@@ -123,54 +151,70 @@ function standbySignal(data: LiveActivityResponse) {
 
 function providerIdleState(
   state: LiveActivityResponse["providerStates"][Provider],
-  idleLabel: string,
-) {
-  if (state === "unconfigured") return "offline";
-  if (state === "unavailable") return "sem sinal";
+  idleLabel: DictionaryKey,
+): DictionaryKey {
+  if (state === "unconfigured") return "live.provider.offline";
+  if (state === "unavailable") return "live.provider.unavailable";
   return idleLabel;
 }
 
 function StandbyPanel({
   data,
   now,
+  locale,
 }: {
   data: LiveActivityResponse;
   now: number;
+  locale: Locale;
 }) {
+  const t = (key: DictionaryKey, values?: Record<string, string | number>) =>
+    translate(locale, key, values);
   const watchingStates = [data.providerStates.simkl, data.providerStates.steam];
   const watchingStatus = watchingStates.every(
     (state) => state === "unconfigured",
   )
-    ? "offline"
+    ? "live.provider.offline"
     : watchingStates.some(
           (state) => state !== "unconfigured" && state !== "unavailable",
         )
-      ? "idle"
-      : "sem sinal";
+      ? "live.provider.idle"
+      : "live.provider.unavailable";
   const latestSignal = standbySignal(data);
   const elapsedMinutes = latestSignal
     ? Math.max(0, Math.floor((now - Date.parse(latestSignal)) / 60000))
     : undefined;
   const signalLabel =
     elapsedMinutes === undefined
-      ? "sem sinal anterior"
+      ? t("live.standby.noPreviousSignal")
       : elapsedMinutes < 1
-        ? "agora"
-        : `há ${elapsedMinutes} min`;
-  const statuses = [
+        ? t("live.signal.now")
+        : t("live.signal.minutesAgo", {
+            count: formatNumber(locale, elapsedMinutes),
+          });
+  const statuses: {
+    icon: string;
+    label: DictionaryKey;
+    state: DictionaryKey;
+  }[] = [
     {
       icon: "</>",
-      label: "CODE",
-      state: providerIdleState(data.providerStates.coding, "idle"),
+      label: "live.provider.code",
+      state: providerIdleState(
+        data.providerStates.coding,
+        "live.provider.idle",
+      ),
     },
     {
       icon: "♫",
-      label: "MUSIC",
-      state: providerIdleState(data.providerStates.spotify, "paused"),
+      label: "live.provider.music",
+      state: providerIdleState(
+        data.providerStates.spotify,
+        "live.provider.paused",
+      ),
     },
     {
       icon: "▣",
-      label: "WATCHING",
+      label: "live.provider.watching",
       state: watchingStatus,
     },
   ];
@@ -181,10 +225,10 @@ function StandbyPanel({
         <div className="live-standby-heading">
           <p className="live-standby-label">
             <span aria-hidden="true" className="live-standby-indicator" />
-            STANDBY
+            {t("live.standby.label")}
           </p>
-          <h3>Nenhuma atividade detectada agora.</h3>
-          <p>Provavelmente vivendo offline por alguns minutos.</p>
+          <h3>{t("live.standby.title")}</h3>
+          <p>{t("live.standby.description")}</p>
         </div>
         <div className="live-standby-statuses">
           {statuses.map((item) => (
@@ -193,9 +237,9 @@ function StandbyPanel({
                 {item.icon}
               </span>
               <span className="live-standby-service">
-                <span>{item.label}</span>
+                <span>{t(item.label)}</span>
                 <span className="live-standby-state">
-                  <i aria-hidden="true" /> {item.state}
+                  <i aria-hidden="true" /> {t(item.state)}
                 </span>
               </span>
               <span aria-hidden="true" className="live-standby-more">
@@ -206,7 +250,7 @@ function StandbyPanel({
         </div>
         <p className="live-standby-signal">
           <span aria-hidden="true">▥</span>
-          último sinal · {signalLabel}
+          {t("live.standby.signal", { signal: signalLabel })}
         </p>
       </div>
       <span aria-hidden="true" className="live-standby-pattern" />
@@ -214,7 +258,9 @@ function StandbyPanel({
   );
 }
 
-export function LiveActivitySection() {
+export function LiveActivitySection({ locale }: { locale: Locale }) {
+  const t = (key: DictionaryKey, values?: Record<string, string | number>) =>
+    translate(locale, key, values);
   const section = useRef<HTMLElement>(null);
   const [data, setData] = useState<LiveActivityResponse | null>(null);
   const [error, setError] = useState(false);
@@ -284,7 +330,7 @@ export function LiveActivitySection() {
           provider === "spotify" || provider === "steam";
         const info =
           isActive && (!requiresFreshData || !stale)
-            ? details(provider, data, stale, clock)
+            ? details(provider, data, stale, clock, locale)
             : null;
         return info ? [{ provider, info }] : [];
       })
@@ -292,43 +338,36 @@ export function LiveActivitySection() {
   return (
     <section ref={section} id="agora" className="chapter live-activity">
       <div className="section-label">
-        <span>06 / AGORA</span>
+        <span>06 / {t("live.chapter")}</span>
         <span>HUGO.DEV ↙</span>
       </div>
       <Reveal>
         <h2>
-          O que estou
+          {t("live.title.firstLine")}
           <br />
-          fazendo <em>agora?</em>
+          <em>{t("live.title.secondLine")}</em>
         </h2>
       </Reveal>
       <div className="live-activity-heading">
-        <p className="intro">
-          Código, trilhas sonoras e outros universos. Um recorte do que anda
-          acontecendo por aqui.
-        </p>
+        <p className="intro">{t("live.intro")}</p>
         <p className={`live-update${stale ? " stale" : ""}`} aria-live="polite">
           {data ? (
             <>
-              <span>{stale ? "Dados antigos" : "Atualizado"}</span>
+              <span>{stale ? t("live.stale") : t("live.updated")}</span>
               <time dateTime={data.generatedAt}>
-                {displayTime(data.generatedAt)}
+                {displayTime(locale, data.generatedAt)}
               </time>
             </>
           ) : endpoint ? (
             error ? (
-              "Não foi possível atualizar agora."
+              t("live.error")
             ) : (
-              "Buscando atividades…"
+              t("live.loading")
             )
           ) : (
-            "As integrações estão sendo preparadas."
+            t("live.disconnected")
           )}
-          {error && data && (
-            <small>
-              Não foi possível atualizar. Exibindo a última consulta.
-            </small>
-          )}
+          {error && data && <small>{t("live.error.previousData")}</small>}
         </p>
       </div>
       {activeCards.length ? (
@@ -345,7 +384,7 @@ export function LiveActivitySection() {
                     <span aria-hidden="true" className="live-symbol">
                       {labels[provider].symbol}
                     </span>
-                    <span className="tag">{labels[provider].category}</span>
+                    <span className="tag">{t(labels[provider].category)}</span>
                     <span className="live-provider">
                       {labels[provider].title}
                     </span>
@@ -369,7 +408,9 @@ export function LiveActivitySection() {
                   </div>
                   {info.observedAt && (
                     <time className="live-observed" dateTime={info.observedAt}>
-                      Atividade em {displayTime(info.observedAt)}
+                      {t("live.observedAt", {
+                        date: displayTime(locale, info.observedAt),
+                      })}
                     </time>
                   )}
                   {info.url && (
@@ -378,7 +419,10 @@ export function LiveActivitySection() {
                       target="_blank"
                       rel="noopener noreferrer"
                     >
-                      Ver no {labels[provider].title} ↗
+                      {t("live.openProvider", {
+                        provider: labels[provider].title,
+                      })}{" "}
+                      ↗
                     </a>
                   )}
                 </article>
@@ -387,16 +431,11 @@ export function LiveActivitySection() {
           })}
         </div>
       ) : data ? (
-        <StandbyPanel data={data} now={clock} />
+        <StandbyPanel data={data} now={clock} locale={locale} />
       ) : error || !endpoint ? (
-        <p className="live-fallback">
-          Devo estar dormindo, no ônibus/dirigindo ou apenas o servidor saiu 💀
-        </p>
+        <p className="live-fallback">{t("live.empty")}</p>
       ) : null}
-      <p className="footnote">
-        Apenas atividades acontecendo agora. Atualização a cada minuto enquanto
-        esta seção está visível.
-      </p>
+      <p className="footnote">{t("live.footnote")}</p>
     </section>
   );
 }

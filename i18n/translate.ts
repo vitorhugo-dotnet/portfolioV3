@@ -31,8 +31,8 @@ export function translatePlural(
 ): string {
   const category = new Intl.PluralRules(intlLocale(locale)).select(count);
   return translate(locale, category === "one" ? oneKey : otherKey, {
-    ...values,
     count,
+    ...values,
   });
 }
 
@@ -73,7 +73,8 @@ export function formatRelativeTime(
   value: Date | string | number,
   now: Date | number = Date.now(),
 ): string {
-  const timestamp = value instanceof Date ? value.getTime() : new Date(value).getTime();
+  const timestamp =
+    value instanceof Date ? value.getTime() : new Date(value).getTime();
   const current = now instanceof Date ? now.getTime() : now;
   const delta = timestamp - current;
   const seconds = Math.round(delta / 1000);
