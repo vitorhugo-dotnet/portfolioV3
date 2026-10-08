@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ResourceShell } from "../../components/document-layout";
-import { hubResources } from "../../components/hub-resources";
-import { getRepositoryWebsites } from "../../lib/repository-websites";
-import { createPageMetadata } from "../../lib/site-config";
-import { isPortfolioWebsite } from "../../lib/site-urls";
+import { ResourceShell } from "../../../components/document-layout";
+import { hubResources } from "../../../components/hub-resources";
+import { getRepositoryWebsites } from "../../../lib/repository-websites";
+import { createPageMetadata } from "../../../lib/site-config";
+import { isPortfolioWebsite } from "../../../lib/site-urls";
 export const metadata: Metadata = createPageMetadata(
   "Hub — App resources | Hugo",
   "Public documents and privacy resources for SonicRelay, The Universe Decides and published apps by Vitor Hugo.",

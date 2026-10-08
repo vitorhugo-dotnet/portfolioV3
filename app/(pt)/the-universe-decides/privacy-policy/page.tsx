@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import {
   DocumentLayout,
   DocumentSection,
-} from "../../../components/document-layout";
-import { createPageMetadata } from "../../../lib/site-config";
+} from "../../../../components/document-layout";
+import { createPageMetadata } from "../../../../lib/site-config";
 export const metadata: Metadata = createPageMetadata(
   "The Universe Decides — Privacy Policy | Hugo",
   "Read how The Universe Decides handles data, permissions, retention and privacy requests.",

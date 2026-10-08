@@ -2,7 +2,8 @@
 import Link from "next/link";
 import type { AnchorHTMLAttributes, ReactNode } from "react";
 import { useEffect, useState } from "react";
-import { LiveActivitySection } from "../components/live-activity";
+import type { Locale } from "../i18n/config.ts";
+import { LiveActivitySection } from "./live-activity";
 import {
   DepthLayer,
   HeroScene,
@@ -11,7 +12,7 @@ import {
   ScrollProgress,
   TechnologyBadges,
   useActiveSection,
-} from "../components/scroll-motion";
+} from "./scroll-motion";
 import {
   fetchGitHubUsername,
   githubProfileUrl,
@@ -186,7 +187,8 @@ function Landscape() {
     </svg>
   );
 }
-export default function Page() {
+export function PortfolioPage({ locale }: { locale: Locale }) {
+  void locale;
   const [filter, setFilter] = useState<StudyFilter>("Todos");
   const [tab, setTab] = useState<ActivityTab>("Tudo");
   const [events, setEvents] = useState<GitHubEvent[]>([]);

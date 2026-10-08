@@ -38,6 +38,7 @@ test("translate uses locale plural rules for count messages", () => {
 test("formatters follow each locale", () => {
   const date = new Date("2025-12-31T12:00:00.000Z");
   assert.equal(formatDate("pt-BR", date), "31/12/2025");
+  assert.equal(formatDate("pt-BR", "2025-12-31T12:00:00.000Z"), "31/12/2025");
   assert.equal(formatDate("en", date), "12/31/2025");
   assert.equal(formatNumber("pt-BR", 123456.789), "123.456,789");
   assert.equal(formatNumber("en", 123456.789), "123,456.789");

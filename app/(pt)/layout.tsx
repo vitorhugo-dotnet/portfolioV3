@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import "./style.css";
+import "../style.css";
 import {
   createPageMetadata,
   siteDescription,
   siteTitle,
-} from "../lib/site-config";
+} from "../../lib/site-config";
 
 export const metadata: Metadata = {
   ...createPageMetadata(siteTitle, siteDescription),

@@ -45,7 +45,9 @@ export function formatDate(
     year: "numeric",
   },
 ): string {
-  return new Intl.DateTimeFormat(intlLocale(locale), options).format(value);
+  return new Intl.DateTimeFormat(intlLocale(locale), options).format(
+    value instanceof Date ? value : new Date(value),
+  );
 }
 
 export function formatNumber(

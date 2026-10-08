@@ -5,6 +5,19 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { publishedRoutes } from "../lib/site-routes.ts";
 
+test("discovers locale routes and keeps existing public paths", async () => {
+  const routes = await publishedRoutes();
+  for (const route of [
+    "/",
+    "/en",
+    "/hub",
+    "/sonicrelay/privacy-policy",
+    "/the-universe-decides/privacy-policy",
+  ]) {
+    assert.equal(routes.filter((candidate) => candidate === route).length, 1);
+  }
+});
+
 test("discovers static App Router pages including route groups, excluding private and dynamic routes", async () => {
   const directory = await mkdtemp(join(tmpdir(), "portfolio-routes-"));
   try {
