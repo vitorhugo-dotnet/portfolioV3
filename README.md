@@ -199,3 +199,16 @@ The sitemap files are generated during each static build:
 Each child sitemap contains URLs for a single host. External websites never enter these sitemaps. The host-specific sitemap index and files are hosted on `hugojava.dev`; **verify ownership of both domains (including their subdomains) in Google Search Console and submit the index there to authorize cross-site sitemap submission**. The canonical-domain sitemap is at `https://hugodotnet.dev/sitemap.xml`. Publishing a sitemap does not guarantee that a search engine indexes a URL. No arbitrary GitHub Website value can add a third-party host to the index.
 
 New static App Router pages are discovered automatically; private directories, parallel slots and dynamic route templates are excluded because their concrete URLs cannot be inferred from file names. GitHub Actions also rebuilds daily at 03:00 America/Sao_Paulo (06:00 UTC), refreshing Website links without a source change. Everything remains static in `out/`; no request-time backend or additional dependency is required.
+
+
+## WebMCP: public read-only portfolio tools
+
+The homepage registers five [WebMCP](https://developer.chrome.com/docs/ai/webmcp/imperative-api) tools after client hydration, only when `document.modelContext.registerTool` is supported. No polyfill or JavaScript runtime dependency is added. Unsupported browsers continue to show the normal site without errors or changes to the UI.
+
+- `portfolio_list_sections`: lists the visible portfolio sections and their links.
+- `portfolio_get_about`: reads the professional introduction and personal interests.
+- `portfolio_get_reading`: reads the public bookshelf entries actually rendered on the page.
+- `portfolio_get_now`: reads the public live-activity UI, including loading, idle, offline and stale labels; it does not trigger provider API calls.
+- `portfolio_get_section`: reads any allowlisted homepage section (products, Android, laboratory, GitHub activity, etc.).
+
+Each execution reads the current DOM, so it uses the same language and content as the visitor's page, not a parallel copy. Tools are annotated read-only and untrusted-content, do not navigate, mutate state, or access credentials, and are unregistered via `AbortController` on unmount. Registration failures are isolated per tool. Run `npm test` for fallback, lifecycle, and data contract coverage. WebMCP availability depends on the visitor's browser and its experimental feature configuration.

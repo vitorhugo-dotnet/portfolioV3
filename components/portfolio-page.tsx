@@ -20,6 +20,7 @@ import {
   type GitHubEventPresentation,
 } from "../lib/github-event-presentation.ts";
 import { linkedInProfileForHostname } from "../lib/site-config.ts";
+import { registerPortfolioWebMCP } from "../lib/webmcp.ts";
 import { LanguageSwitcher } from "./language-switcher";
 import { LiveActivitySection } from "./live-activity";
 import { ReadingLogSection } from "./reading-log";
@@ -186,6 +187,7 @@ export function PortfolioPage({ locale }: { locale: Locale }) {
   const githubRepo = (repository: string) =>
     githubRepositoryUrl(githubUsername, repository);
   const activeSection = useActiveSection();
+  useEffect(() => registerPortfolioWebMCP(document), []);
   useEffect(() => {
     setLinkedinProfile(linkedInProfileForHostname(window.location.hostname));
     fetch("/repos.json")
