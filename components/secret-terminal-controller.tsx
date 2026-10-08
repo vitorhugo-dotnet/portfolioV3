@@ -40,7 +40,7 @@ export function SecretTerminalController({
   const progressRef = useRef<SecretSequenceState>(
     INITIAL_SECRET_SEQUENCE_STATE,
   );
-  const hintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hintTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
