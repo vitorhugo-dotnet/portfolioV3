@@ -45,8 +45,7 @@ const ptBR = {
     "Tela e áudio em tempo real. Um laboratório de captura, codecs e comunicação entre dispositivos.",
   "product.explore": "Explorar projeto",
   "product.job.tag": "03 / ORGANIZAÇÃO & AUTOMAÇÃO",
-  "product.job.description":
-    "Uma plataforma para organizar candidaturas, acompanhar o processo e integrar o fluxo de busca.",
+  "product.job.description": "Uma plataforma para organizar candidaturas, acompanhar o processo e integrar o fluxo de busca. Além de MCP para integrar com plataformas como ChatGPT e Claude, possuí um Chat de IA integrado.",
   "product.job.stage.applied": "CANDIDATURA ENVIADA",
   "product.job.stage.interview": "ENTREVISTA",
   "product.job.stage.nextStep": "PRÓXIMA ETAPA",
