@@ -46,8 +46,7 @@ const en = {
     "Real-time screen and audio sharing. A lab for capture, codecs, and communication between devices.",
   "product.explore": "Explore project",
   "product.job.tag": "03 / ORGANIZATION & AUTOMATION",
-  "product.job.description":
-    "A platform to organize job applications, track each step, and connect the job-search workflow.",
+  "product.job.description": "A platform to organize job applications, track each step, and connect the job-search workflow. In addition to MCP for integration with platforms like ChatGPT and Claude, it features a built-in AI chat.",
   "product.job.stage.applied": "APPLIED",
   "product.job.stage.interview": "INTERVIEW",
   "product.job.stage.nextStep": "NEXT STEP",
