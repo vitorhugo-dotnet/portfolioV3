@@ -8,6 +8,10 @@
     {
       "tag": "v1",
       "new_sqlite_classes": ["SimklTokenStore"]
+    },
+    {
+      "tag": "v2",
+      "new_sqlite_classes": ["WakaTimeTokenStore"]
     }
   ],
   "vars": {
@@ -39,6 +43,10 @@
           {
             "name": "SIMKL_TOKEN_STORE",
             "class_name": "SimklTokenStore"
+          },
+          {
+            "name": "WAKATIME_TOKEN_STORE",
+            "class_name": "WakaTimeTokenStore"
           }
         ]
       },
@@ -64,6 +72,10 @@
           {
             "name": "SIMKL_TOKEN_STORE",
             "class_name": "SimklTokenStore"
+          },
+          {
+            "name": "WAKATIME_TOKEN_STORE",
+            "class_name": "WakaTimeTokenStore"
           }
         ]
       },

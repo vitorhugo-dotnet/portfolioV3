@@ -4,7 +4,10 @@ import type {
   ProviderState,
 } from "../../lib/live-activity.ts";
 export interface Env {
-  WAKATIME_API_KEY?: string;
+  WAKATIME_CLIENT_ID?: string;
+  WAKATIME_CLIENT_SECRET?: string;
+  WAKATIME_REFRESH_TOKEN?: string;
+  WAKATIME_TOKEN_STORE?: WakaTimeTokenStoreNamespace;
   SPOTIFY_CLIENT_ID?: string;
   SPOTIFY_CLIENT_SECRET?: string;
   SPOTIFY_REFRESH_TOKEN?: string;
@@ -30,6 +33,12 @@ export interface MonitorStateStore {
   delete(key: string): Promise<void>;
 }
 export interface SimklTokenStoreNamespace {
+  idFromName(name: string): unknown;
+  get(id: unknown): {
+    fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>;
+  };
+}
+export interface WakaTimeTokenStoreNamespace {
   idFromName(name: string): unknown;
   get(id: unknown): {
     fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>;

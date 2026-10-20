@@ -7,6 +7,7 @@ import type {
 } from "./types.ts";
 
 export { SimklTokenStore } from "./simkl-oauth.ts";
+export { WakaTimeTokenStore } from "./wakatime-oauth.ts";
 
 interface ActivityCache {
   match(request: Request): Promise<Response | undefined>;

@@ -7,31 +7,53 @@ import {
   timestamp,
 } from "../provider-http.ts";
 import type { Env, ProviderDependencies, ProviderResult } from "../types.ts";
+import {
+  getWakaTimeAccessToken,
+  WakaTimeTokenError,
+} from "../wakatime-oauth.ts";
 
 export async function getCoding(
   env: Env,
   deps: ProviderDependencies,
 ): Promise<ProviderResult<"coding">> {
-  if (!env.WAKATIME_API_KEY) return { state: "unconfigured" };
+  if (!env.WAKATIME_CLIENT_ID || !env.WAKATIME_CLIENT_SECRET)
+    return { state: "unconfigured" };
   try {
     const utcDay = new Date(deps.now()).toISOString().slice(0, 10);
-    const headers = {
-      Authorization: `Basic ${btoa(env.WAKATIME_API_KEY)}`,
+    const fetchCodingData = async (url: URL, token: string) => {
+      try {
+        return await fetchProviderJson(
+          url,
+          { headers: { Authorization: `Bearer ${token}` } },
+          deps,
+        );
+      } catch (error) {
+        if (
+          !(error instanceof ProviderHttpError) ||
+          (error.status !== 401 && error.status !== 403)
+        )
+          throw error;
+        const refreshed = await getWakaTimeAccessToken(env, { force: true });
+        return await fetchProviderJson(
+          url,
+          { headers: { Authorization: `Bearer ${refreshed}` } },
+          deps,
+        );
+      }
     };
+    const accessToken = await getWakaTimeAccessToken(env);
     const [heartbeatRaw, summaryRaw] = await Promise.all([
-      fetchProviderJson(
+      fetchCodingData(
         new URL(
           `https://api.wakatime.com/api/v1/users/current/heartbeats?date=${utcDay}`,
         ),
-        { headers },
-        deps,
+        accessToken,
       ),
-      fetchProviderJson(
+      fetchCodingData(
         new URL(
           `https://api.wakatime.com/api/v1/users/current/summaries?start=${utcDay}&end=${utcDay}`,
         ),
-        { headers },
-        deps,
+        accessToken,
       ),
     ]);
     const heartbeatResponse = record(heartbeatRaw);
@@ -67,12 +89,11 @@ export async function getCoding(
     for (const date of dates) {
       if (date === utcDay) continue;
       const response = record(
-        await fetchProviderJson(
+        await fetchCodingData(
           new URL(
             `https://api.wakatime.com/api/v1/users/current/heartbeats?date=${date}`,
           ),
-          { headers },
-          deps,
+          accessToken,
         ),
       );
       if (!Array.isArray(response.data)) throw Error("Invalid coding payload");
@@ -139,11 +160,21 @@ export async function getCoding(
       },
     };
   } catch (error) {
+    if (
+      error instanceof WakaTimeTokenError &&
+      (error.code === "unconfigured" || error.code === "token_store_required")
+    )
+      return { state: "unconfigured" };
     console.error("provider_error", {
       provider: "wakatime",
-      status: error instanceof ProviderHttpError ? error.status : undefined,
+      status:
+        error instanceof ProviderHttpError ||
+        error instanceof WakaTimeTokenError
+          ? error.status
+          : undefined,
       error:
-        error instanceof ProviderHttpError
+        error instanceof ProviderHttpError ||
+        error instanceof WakaTimeTokenError
           ? "Provider request failed"
           : error instanceof Error
             ? error.message

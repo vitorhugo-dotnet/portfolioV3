@@ -24,6 +24,20 @@ function deps(
     },
   };
 }
+
+function wakaEnv(token = "wakatime-access") {
+  return {
+    WAKATIME_CLIENT_ID: "wakatime-client",
+    WAKATIME_CLIENT_SECRET: "wakatime-client-secret",
+    WAKATIME_REFRESH_TOKEN: "wakatime-refresh",
+    WAKATIME_TOKEN_STORE: {
+      idFromName: (name: string) => name,
+      get: () => ({
+        fetch: async () => Response.json({ access_token: token }),
+      }),
+    },
+  };
+}
 test("coding is active only for a recent nonfuture heartbeat and hides project paths", async () => {
   for (const [age, status] of [
     [899, "active"],
@@ -54,7 +68,7 @@ test("coding is active only for a recent nonfuture heartbeat and hides project p
             ],
           },
     );
-    const result = await getCoding({ WAKATIME_API_KEY: "sentinel" }, d);
+    const result = await getCoding(wakaEnv(), d);
     assert.equal(result.data?.status, status);
     assert.equal(result.data?.durationMinutes, 30);
     assert.equal(result.data?.project, undefined);
@@ -63,7 +77,7 @@ test("coding is active only for a recent nonfuture heartbeat and hides project p
 });
 test("coding uses a 15-minute window, prioritizes useful languages, and masks filenames", async () => {
   const result = await getCoding(
-    { WAKATIME_API_KEY: "sentinel" },
+    wakaEnv(),
     deps((url) =>
       url.pathname.endsWith("heartbeats")
         ? {
@@ -91,7 +105,7 @@ test("coding uses a 15-minute window, prioritizes useful languages, and masks fi
 });
 test("coding is idle after 15 minutes and does not expose a full filename", async () => {
   const result = await getCoding(
-    { WAKATIME_API_KEY: "sentinel" },
+    wakaEnv(),
     deps((url) =>
       url.pathname.endsWith("heartbeats")
         ? {
@@ -111,7 +125,7 @@ test("coding is idle after 15 minutes and does not expose a full filename", asyn
 });
 test("coding without a heartbeat does not invent current activity", async () => {
   const result = await getCoding(
-    { WAKATIME_API_KEY: "key" },
+    wakaEnv(),
     deps((url) =>
       url.pathname.endsWith("heartbeats")
         ? { data: [] }
@@ -121,21 +135,108 @@ test("coding without a heartbeat does not invent current activity", async () => 
   assert.equal(result.data?.status, "idle");
   assert.equal(result.data?.observedAt, undefined);
 });
-test("WakaTime uses the API key directly and explicit summary dates", async () => {
-  let authorization: string | null = null;
+test("WakaTime uses OAuth bearer tokens and explicit summary dates", async () => {
+  const authorizations: Array<string | null> = [];
   let summaryUrl: URL | undefined;
   await getCoding(
-    { WAKATIME_API_KEY: "12345" },
+    wakaEnv(),
     deps((url, init) => {
-      authorization = new Headers(init?.headers).get("Authorization");
+      authorizations.push(new Headers(init?.headers).get("Authorization"));
       if (url.pathname.endsWith("summaries")) summaryUrl = url;
       return { data: [] };
     }),
   );
-  assert.equal(authorization, "Basic MTIzNDU=");
+  assert.deepEqual(authorizations, [
+    "Bearer wakatime-access",
+    "Bearer wakatime-access",
+  ]);
   assert.equal(summaryUrl?.searchParams.get("start"), "2026-10-07");
   assert.equal(summaryUrl?.searchParams.get("end"), "2026-10-07");
   assert.equal(summaryUrl?.searchParams.has("range"), false);
+});
+
+test("WakaTime refreshes once and retries an unauthorized API read", async () => {
+  const requestedForce: boolean[] = [];
+  const heartbeatAuthorizations: string[] = [];
+  let unauthorizedHeartbeat = true;
+  const env = {
+    ...wakaEnv(),
+    WAKATIME_TOKEN_STORE: {
+      idFromName: (name: string) => name,
+      get: () => ({
+        fetch: async (request: Request) => {
+          const body = await request.json();
+          const force = Boolean((body as { force?: boolean }).force);
+          requestedForce.push(force);
+          return Response.json({
+            access_token: force ? "refreshed-access" : "expired-access",
+          });
+        },
+      }),
+    },
+  };
+  const result = await getCoding(
+    env,
+    deps((url, init) => {
+      if (url.pathname.endsWith("heartbeats")) {
+        const authorization =
+          new Headers(init?.headers).get("Authorization") ?? "";
+        heartbeatAuthorizations.push(authorization);
+        if (
+          unauthorizedHeartbeat &&
+          authorization === "Bearer expired-access"
+        ) {
+          unauthorizedHeartbeat = false;
+          return new Response("unauthorized", { status: 401 });
+        }
+        return { data: [] };
+      }
+      return { data: [{ grand_total: { total_seconds: 60 } }] };
+    }),
+  );
+  assert.equal(result.state, "available");
+  assert.deepEqual(heartbeatAuthorizations, [
+    "Bearer expired-access",
+    "Bearer refreshed-access",
+  ]);
+  assert.equal(requestedForce.filter(Boolean).length, 1);
+});
+
+test("WakaTime does not retry a rejected refreshed bearer token more than once", async () => {
+  const heartbeatAuthorizations: string[] = [];
+  const result = await getCoding(
+    {
+      ...wakaEnv(),
+      WAKATIME_TOKEN_STORE: {
+        idFromName: (name: string) => name,
+        get: () => ({
+          fetch: async (request: Request) => {
+            const body = await request.json();
+            return Response.json({
+              access_token: (body as { force?: boolean }).force
+                ? "refreshed-access"
+                : "expired-access",
+            });
+          },
+        }),
+      },
+    },
+    deps((url, init) => {
+      if (url.pathname.endsWith("heartbeats")) {
+        heartbeatAuthorizations.push(
+          new Headers(init?.headers).get("Authorization") ?? "",
+        );
+        return new Response("private-token sentinel", { status: 403 });
+      }
+      return { data: [] };
+    }),
+  );
+  assert.equal(result.state, "unavailable");
+  assert.deepEqual(heartbeatAuthorizations, [
+    "Bearer expired-access",
+    "Bearer refreshed-access",
+  ]);
+  assert.ok(!JSON.stringify(result).includes("private-token sentinel"));
 });
 const track = {
   name: "Track",
@@ -549,10 +650,7 @@ test("coding remains active across UTC and account-local midnight", async () => 
           }
         : { data: [{ grand_total: { total_seconds: 60 } }] },
     );
-    const result = await getCoding(
-      { WAKATIME_API_KEY: "key" },
-      { ...d, now: () => clock },
-    );
+    const result = await getCoding(wakaEnv(), { ...d, now: () => clock });
     assert.equal(result.data?.status, "active", `${timezone} at ${time}`);
     assert.equal(
       result.data?.observedAt,

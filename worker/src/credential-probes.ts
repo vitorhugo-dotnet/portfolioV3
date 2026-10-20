@@ -6,6 +6,10 @@ import type {
   Env,
   ProviderDependencies,
 } from "./types.ts";
+import {
+  getWakaTimeAccessToken,
+  WakaTimeTokenError,
+} from "./wakatime-oauth.ts";
 
 async function probeJson(
   url: URL,
@@ -41,21 +45,37 @@ async function probeJson(
 }
 
 async function probeWakaTime(
-  apiKey: string | undefined,
+  env: Env,
   deps: ProviderDependencies,
 ): Promise<CredentialProbeResult> {
-  if (!apiKey) return { state: "unconfigured" };
-  return probeJson(
-    new URL("https://api.wakatime.com/api/v1/users/current"),
-    { headers: { Authorization: `Basic ${btoa(apiKey)}` } },
-    deps,
-    (payload) => {
-      if (!payload || typeof payload !== "object" || Array.isArray(payload))
-        return false;
-      const data = (payload as Record<string, unknown>).data;
-      return Boolean(data && typeof data === "object" && !Array.isArray(data));
-    },
-  );
+  if (!env.WAKATIME_CLIENT_ID || !env.WAKATIME_CLIENT_SECRET)
+    return { state: "unconfigured" };
+  try {
+    const accessToken = await getWakaTimeAccessToken(env);
+    return await probeJson(
+      new URL("https://api.wakatime.com/api/v1/users/current"),
+      { headers: { Authorization: `Bearer ${accessToken}` } },
+      deps,
+      (payload) => {
+        if (!payload || typeof payload !== "object" || Array.isArray(payload))
+          return false;
+        const data = (payload as Record<string, unknown>).data;
+        return Boolean(
+          data && typeof data === "object" && !Array.isArray(data),
+        );
+      },
+    );
+  } catch (error) {
+    if (!(error instanceof WakaTimeTokenError))
+      return { state: "transient", reason: "provider_error" };
+    if (error.code === "unconfigured" || error.code === "token_store_required")
+      return { state: "unconfigured" };
+    if (error.code === "invalid_grant")
+      return { state: "invalid", reason: "invalid_token" };
+    if (error.code === "invalid_client" || error.status === 401)
+      return { state: "invalid", reason: "invalid_client" };
+    return { state: "transient", reason: "provider_error" };
+  }
 }
 
 async function probeSpotify(
@@ -153,7 +173,7 @@ export async function probeActivityCredentials(
   Record<"coding" | "spotify" | "simkl" | "steam", CredentialProbeResult>
 > {
   const [coding, spotify, simkl, steam] = await Promise.all([
-    probeWakaTime(env.WAKATIME_API_KEY, deps),
+    probeWakaTime(env, deps),
     probeSpotify(env, deps),
     probeSimkl(env, deps),
     probeSteam(env, deps),

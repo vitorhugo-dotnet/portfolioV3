@@ -21,8 +21,20 @@ function dependencies(handler: RequestHandler): ProviderDependencies {
   };
 }
 
+const wakaCredentials: Partial<Env> = {
+  WAKATIME_CLIENT_ID: "waka-client",
+  WAKATIME_CLIENT_SECRET: "waka-client-secret",
+  WAKATIME_REFRESH_TOKEN: "waka-refresh-secret",
+  WAKATIME_TOKEN_STORE: {
+    idFromName: (name) => name,
+    get: () => ({
+      fetch: async () => Response.json({ access_token: "waka-private-access" }),
+    }),
+  },
+};
+
 const credentials: Env = {
-  WAKATIME_API_KEY: "waka-secret",
+  ...wakaCredentials,
   SPOTIFY_CLIENT_ID: "spotify-client",
   SPOTIFY_CLIENT_SECRET: "spotify-secret",
   SPOTIFY_REFRESH_TOKEN: "spotify-refresh",
@@ -97,7 +109,7 @@ test("credential probes authenticate to each official provider using minimal end
   assert.equal(waka?.url.pathname, "/api/v1/users/current");
   assert.equal(
     new Headers(waka?.init?.headers).get("Authorization"),
-    `Basic ${btoa("waka-secret")}`,
+    "Bearer waka-private-access",
   );
   const simkl = requests.find(
     (request) => request.url.hostname === "api.simkl.com",
@@ -133,7 +145,7 @@ test("WakaTime, Simkl, and Steam classify unauthorized responses as invalid", as
   ] as const) {
     const env: Env =
       provider === "coding"
-        ? { WAKATIME_API_KEY: "key" }
+        ? { ...wakaCredentials }
         : provider === "simkl"
           ? { SIMKL_CLIENT_ID: "client", SIMKL_ACCESS_TOKEN: "token" }
           : { STEAM_API_KEY: "key", STEAM_ID: "76561198000000000" };
@@ -145,6 +157,35 @@ test("WakaTime, Simkl, and Steam classify unauthorized responses as invalid", as
     assert.equal(result[provider].reason, "unauthorized");
     assert.ok(!JSON.stringify(result).includes("private-error-sentinel"));
   }
+});
+
+test("WakaTime invalid refresh grants are invalid without exposing token errors", async () => {
+  const env: Env = {
+    ...wakaCredentials,
+    WAKATIME_TOKEN_STORE: {
+      idFromName: (name) => name,
+      get: () => ({
+        fetch: async () =>
+          Response.json(
+            {
+              error: "invalid_grant",
+              error_description: "private-access-token private-refresh-token",
+            },
+            { status: 400 },
+          ),
+      }),
+    },
+  };
+  const result = await probeActivityCredentials(
+    env,
+    dependencies(() => ({})),
+  );
+  assert.deepEqual(result.coding, {
+    state: "invalid",
+    reason: "invalid_token",
+  });
+  assert.ok(!JSON.stringify(result).includes("private-access-token"));
+  assert.ok(!JSON.stringify(result).includes("private-refresh-token"));
 });
 
 test("Spotify invalid_grant, invalid_client, and 401 are invalid credentials", async () => {
@@ -163,7 +204,7 @@ test("Spotify invalid_grant, invalid_client, and 401 are invalid credentials", a
     ],
   ] as const) {
     const result = await probeActivityCredentials(
-      { ...credentials, WAKATIME_API_KEY: undefined },
+      { ...credentials, WAKATIME_CLIENT_ID: undefined },
       dependencies(() => response),
     );
     assert.deepEqual(result.spotify, { state: "invalid", reason });
@@ -178,7 +219,7 @@ test("transient and ambiguous provider failures never become invalid credentials
     new Response("{", { status: 200 }),
   ]) {
     const result = await probeActivityCredentials(
-      { WAKATIME_API_KEY: "key" },
+      { ...wakaCredentials },
       dependencies(() => response),
     );
     assert.deepEqual(result.coding, {
@@ -198,7 +239,7 @@ test("transient and ambiguous provider failures never become invalid credentials
   });
   assert.ok(!JSON.stringify(networkError).includes("private network details"));
   const timeout = await probeActivityCredentials(
-    { WAKATIME_API_KEY: "key" },
+    { ...wakaCredentials },
     dependencies((_url, init) => {
       assert.ok(init?.signal);
       throw new DOMException("Aborted", "AbortError");
@@ -214,7 +255,7 @@ test("missing credentials skip only their provider and do not make calls", async
   let requests = 0;
   const result = await probeActivityCredentials(
     {
-      WAKATIME_API_KEY: "key",
+      ...wakaCredentials,
       SIMKL_CLIENT_ID: "client-without-token",
     },
     dependencies(() => {
@@ -237,7 +278,7 @@ test("invalid credential alerts are deduplicated until a later valid probe", asy
   const { state, values } = memoryState();
   const env = {
     ...monitorConfig,
-    WAKATIME_API_KEY: "waka-secret",
+    ...wakaCredentials,
     ACTIVITY_MONITOR_STATE: state,
   } as Env;
   const deps = dependencies((url, init) => {
@@ -257,7 +298,7 @@ test("invalid credential alerts are deduplicated until a later valid probe", asy
   assert.equal(messages.length, 1);
   assert.match(messages[0] ?? "", /WakaTime/);
   assert.ok(!messages.join(" ").includes("private provider error"));
-  assert.ok(!JSON.stringify([...values]).includes("waka-secret"));
+  assert.ok(!JSON.stringify([...values]).includes("waka-refresh-secret"));
   invalid = false;
   await runCredentialMonitor(env, deps);
   assert.equal(values.has("activity-monitor:credential:coding"), false);
@@ -272,7 +313,7 @@ test("invalid credential alerts remain separate for each configured provider", a
   await runCredentialMonitor(
     {
       ...monitorConfig,
-      WAKATIME_API_KEY: "waka",
+      ...wakaCredentials,
       SIMKL_CLIENT_ID: "client",
       SIMKL_ACCESS_TOKEN: "token",
       STEAM_API_KEY: "steam",

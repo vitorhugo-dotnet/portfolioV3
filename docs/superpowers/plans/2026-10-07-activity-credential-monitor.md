@@ -15,7 +15,7 @@
 - The public activity endpoint must not expose credentials, webhook URLs, or monitor state.
 - Only production runs the daily monitor; preview sends no Discord notifications.
 - Store provider names, alert-state identifiers, and the Spotify authorization timestamp in KV; never store credentials or webhook URLs.
-- WakaTime, Simkl, and Steam HTTP 401/403, Spotify `invalid_grant`, and Spotify `invalid_client`/401 identify invalid credentials.
+- WakaTime, Simkl, and Steam HTTP 401/403, WakaTime and Spotify `invalid_grant`, and invalid client/401 responses identify invalid credentials.
 - Network failures, timeout, 429, 5xx, malformed data, and ambiguous errors are transient and must not create false invalid-credential or expiration alerts.
 - Spotify age warning starts at 173 elapsed days; expected expiration warning starts at 180 days.
 - Only send alert state to KV after Discord confirms delivery; successful probes clear the provider's invalid state.
@@ -61,7 +61,7 @@
 **Interfaces:** `probeActivityCredentials(env: Env, deps: ProviderDependencies): Promise<Record<"coding" | "spotify" | "simkl" | "steam", CredentialProbeResult>>`, where `CredentialProbeResult` is `{ state: "valid" | "invalid" | "transient" | "unconfigured"; reason?: "invalid_token" | "invalid_client" | "unauthorized" | "provider_error" }`. Never include response bodies, credentials, or URLs in results.
 
 - [x] Write fake-fetch tests for WakaTime `/api/v1/users/current`, Spotify refresh exchange, Simkl `/sync/activities`, and Steam `ISteamUser/GetPlayerSummaries`; verify correct auth headers/query fields without returning secrets in results.
-- [x] Test 401/403 invalid classification for WakaTime, Simkl, and Steam; Spotify `invalid_grant`, `invalid_client`, and 401 invalid classification; classify 429, 5xx, timeout, invalid JSON, and unexpected 4xx as transient.
+- [x] Test 401/403 invalid classification for WakaTime, Simkl, and Steam; WakaTime and Spotify `invalid_grant`, `invalid_client`, and 401 invalid classification; classify 429, 5xx, timeout, invalid JSON, and unexpected 4xx as transient.
 - [x] Test each missing/incomplete provider configuration returns `unconfigured` for that provider while still probing the remaining configured providers.
 - [x] Run `node --experimental-strip-types --test tests/activity-credential-monitor.test.ts`; confirm the new tests fail.
 - [x] Implement provider-specific probes with five-second aborts and official HTTPS endpoints; query no playback/history data beyond the minimum authenticated validity probe.

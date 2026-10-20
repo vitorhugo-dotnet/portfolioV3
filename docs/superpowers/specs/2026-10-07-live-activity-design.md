@@ -34,7 +34,7 @@ Cachear somente o DTO normalizado no Cache API do Worker por 60 segundos, com ch
 
 CORS permite os dois domínios existentes e o domínio Pages do projeto, incluindo seus previews, validando hostname com limites de sufixo. localhost é permitido apenas em desenvolvimento. Não usar cookies ou credentials no fetch. CORS não torna o endpoint privado: todo campo retornado deve ser seguro para acesso público.
 
-Secrets do Worker: `WAKATIME_API_KEY`, `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `SPOTIFY_REFRESH_TOKEN`, `SIMKL_CLIENT_ID`, `SIMKL_ACCESS_TOKEN`, `STEAM_API_KEY`. Configurar `STEAM_ID` como variável do Worker; não incluir dados de conta no DTO. Configuração não secreta inclui origens autorizadas e opção de exposição do nome de projeto. Secrets são provisionados separadamente nos dois ambientes usando Wrangler; CI não os injeta em assets do site.
+Secrets do Worker: `WAKATIME_CLIENT_ID`, `WAKATIME_CLIENT_SECRET`, `WAKATIME_REFRESH_TOKEN`, `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `SPOTIFY_REFRESH_TOKEN`, `SIMKL_CLIENT_ID`, `SIMKL_ACCESS_TOKEN`, `STEAM_API_KEY`. Configurar `STEAM_ID` como variável do Worker; não incluir dados de conta no DTO. Configuração não secreta inclui origens autorizadas e opção de exposição do nome de projeto. Secrets são provisionados separadamente nos dois ambientes usando Wrangler; CI não os injeta em assets do site. WakaTime usa OAuth com escopos `read_summaries` e `read_heartbeats`; cada ambiente mantém tokens rotacionados no seu Durable Object SQLite.
 
 ## Frontend
 

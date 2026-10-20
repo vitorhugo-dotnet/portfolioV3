@@ -83,10 +83,35 @@ Section **07 — “O que estou fazendo agora?”** follows the GitHub timeline 
 
 `worker/src/index.ts` serves `GET /api/activity`; each adapter returns only normalized public activity. The Cache API stores that DTO for 60 seconds per Worker origin. Query strings do not create new cache entries. CORS is applied separately for each response, allowing the two portfolio domains and this project's Pages/preview domains. Localhost is allowed only for local development. CORS is not authentication; all returned activity is intentionally public.
 
-Configure Worker secrets interactively, with no credential values in source, command arguments, logs, `NEXT_PUBLIC_*` or static files:
+WakaTime API reads use OAuth 2.0. Register an app at [wakatime.com/apps](https://wakatime.com/apps) and add `https://wakatime.com/oauth/test` as an allowed redirect URL. The local setup script requests only `read_summaries` and `read_heartbeats`; it validates the callback state, exchanges the one-time code, and prints only the refresh token and the command to store it. The client secret and access token are never printed. Set the client ID and secret as Worker secrets for both environments:
 
 ```bash
-npx wrangler secret put WAKATIME_API_KEY --config worker/wrangler.jsonc --env preview
+npx wrangler secret put WAKATIME_CLIENT_ID --config worker/wrangler.jsonc --env preview
+npx wrangler secret put WAKATIME_CLIENT_SECRET --config worker/wrangler.jsonc --env preview
+npx wrangler secret put WAKATIME_CLIENT_ID --config worker/wrangler.jsonc --env production
+npx wrangler secret put WAKATIME_CLIENT_SECRET --config worker/wrangler.jsonc --env production
+```
+
+Run the local setup once per environment, authorizing each separately so preview and production get independent refresh-token grants. Use the same app credentials and registered redirect URL; set `WAKATIME_ENV` to `preview` or `production` before running the script. Keep these values in the current shell only:
+
+```bash
+export WAKATIME_CLIENT_ID="your-app-id"
+export WAKATIME_CLIENT_SECRET="your-app-secret"
+export WAKATIME_REDIRECT_URI="https://wakatime.com/oauth/test"
+export WAKATIME_ENV="preview"
+node --experimental-strip-types scripts/wakatime-auth.ts
+```
+
+Follow the printed command and paste the refresh token when Wrangler prompts. Then run `export WAKATIME_ENV="production"` and run the authorization flow again. The Worker stores each environment's rotated refresh token in its SQLite-backed `WakaTimeTokenStore` Durable Object. Remove the obsolete API-key secret from both Workers after migration:
+
+```bash
+npx wrangler secret delete WAKATIME_API_KEY --config worker/wrangler.jsonc --env preview
+npx wrangler secret delete WAKATIME_API_KEY --config worker/wrangler.jsonc --env production
+```
+
+Configure the other Worker secrets interactively, with no credential values in source, command arguments, logs, `NEXT_PUBLIC_*` or static files:
+
+```bash
 npx wrangler secret put SPOTIFY_CLIENT_ID --config worker/wrangler.jsonc --env preview
 npx wrangler secret put SPOTIFY_CLIENT_SECRET --config worker/wrangler.jsonc --env preview
 npx wrangler secret put SPOTIFY_REFRESH_TOKEN --config worker/wrangler.jsonc --env preview
@@ -139,12 +164,12 @@ $env:SIMKL_REDIRECT_URI = $null
 
 Provider setup and behavior:
 
-- **WakaTime:** [official API](https://wakatime.com/developers). API key remains server-side. Coding is active only with a heartbeat in the last five minutes; language/editor and today's minutes are normalized. Project name requires explicit opt-in.
+- **WakaTime:** [official API and OAuth documentation](https://wakatime.com/developers). API reads use server-side OAuth bearer tokens with `read_summaries` and `read_heartbeats` scopes. The Worker caches access tokens, persists rotated refresh tokens in a SQLite-backed Durable Object, and retries one unauthorized live read after refreshing. Coding is active only with a heartbeat in the last five minutes; language/editor and today's minutes are normalized. Project name requires explicit opt-in.
 - **Spotify:** [official API](https://developer.spotify.com/documentation/web-api). Obtain your account's refresh token out of band with `user-read-currently-playing` and `user-read-recently-played` scopes. The Worker refreshes/reuses access tokens in memory and retries a 401 once. It shows recent tracks when nothing is playing. Reprovision expired/revoked refresh credentials as needed; the website does not provide an OAuth login or persistent token storage.
 - **Simkl:** [official AUTH V2 flow](https://api.simkl.org/api-reference/oauth2-authorization-code), [refresh tokens](https://api.simkl.org/api-reference/oauth2-tokens), and [API reference](https://api.simkl.org/). The Worker keeps the access and refresh token pair in the SQLite-backed `SimklTokenStore` Durable Object, refreshes before access-token expiry, and retries a rejected API request once after refreshing. The refresh token remains server-side and the Durable Object serializes refreshes so a single Simkl grant is not refreshed concurrently. Bootstrap the initial grant locally by setting `SIMKL_CLIENT_ID`, `SIMKL_CLIENT_SECRET`, and the exact registered `SIMKL_REDIRECT_URI` in your local environment, then run `node --experimental-strip-types scripts/simkl-auth.ts`. The script checks PKCE state and Simkl's issuer before exchanging the code, and prints only the refresh token for setting as a Worker secret. The adapter checks `/sync/activities` and watch history, using a rolling 30-day window. Items older than this window may not appear; activity becomes idle after 40 minutes without a new watch-history entry.
 - **Steam:** [GetPlayerSummaries](https://partner.steamgames.com/doc/webapi/ISteamUser) and [GetRecentlyPlayedGames](https://partner.steamgames.com/doc/webapi/IPlayerService), through the official public `api.steampowered.com` host. Current `gameid`/`gameextrainfo` takes precedence. Otherwise a game with most playtime in the last two weeks is labeled “Jogado recentemente”; the API does not establish the last game chronologically. Private profiles/Game Details and missing history show a fallback. No SteamDB or scraping.
 
-Run locally with an ignored `worker/.dev.vars` file containing your credentials and optional `STEAM_ID`, then `npm run worker:dev`. Set `NEXT_PUBLIC_ACTIVITY_API_URL=http://localhost:8787/api/activity` for `npm run dev`. The production build can leave the URL unset to show disconnected placeholders. The Worker uses in-memory provider snapshots, the edge Cache API, the existing monitoring KV namespace, and a SQLite-backed Durable Object for Simkl's refresh token pair.
+Run locally with an ignored `worker/.dev.vars` file containing your OAuth client credentials, initial `WAKATIME_REFRESH_TOKEN`, other provider credentials, and optional `STEAM_ID`, then `npm run worker:dev`. Wrangler persists local Durable Object state in `.wrangler`. Set `NEXT_PUBLIC_ACTIVITY_API_URL=http://localhost:8787/api/activity` for `npm run dev`. The production build can leave the URL unset to show disconnected placeholders. The Worker uses in-memory provider snapshots, the edge Cache API, the existing monitoring KV namespace, and SQLite-backed Durable Objects for Simkl and WakaTime token pairs.
 
 Validation commands:
 

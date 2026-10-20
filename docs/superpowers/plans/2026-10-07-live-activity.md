@@ -56,7 +56,7 @@
 LiveActivityResponse contém generatedAt, providerStates e os quatro objetos opcionais da spec, cada um com observedAt opcional.
 ProviderResult<K> contém state e data?: LiveActivityResponse[K].
 ProviderDependencies contém fetch: typeof fetch, now: () => number.
-Env contém os sete secrets da spec, STEAM_ID, ALLOWED_ORIGINS, PAGES_PROJECT e EXPOSE_CODING_PROJECT; DEVELOPMENT permite localhost somente localmente.
+Env contém os secrets dos provedores da spec, credenciais OAuth e Durable Object do WakaTime, STEAM_ID, ALLOWED_ORIGINS, PAGES_PROJECT e EXPOSE_CODING_PROJECT; DEVELOPMENT permite localhost somente localmente.
 Produz parseLiveActivity(value: unknown): LiveActivityResponse | null; fetchProviderJson(url: URL, init: RequestInit, deps: ProviderDependencies): Promise<unknown>; safeText(value: unknown): string | undefined; safeHttpsUrl(value: unknown, allowedHosts: readonly string[]): string | undefined.
 
 - [ ] Escrever testes: parseLiveActivity rejeita timestamps inválidos e estados inválidos; safeText limita a 200 caracteres; safeHttpsUrl rejeita javascript:, credentials e hostname com sufixo enganoso; fetchProviderJson aborta após 5.000 ms e rejeita HTTP não OK/JSON inválido. Use clock/fetch simulados.
